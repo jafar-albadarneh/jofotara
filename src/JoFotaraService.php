@@ -231,7 +231,15 @@ class JoFotaraService
 
                 $providedTotals = $this->invoiceTotals->toArray();
                 $expectedTotals = $calculatedTotals->toArray();
-
+                
+                 $providedTotals = array_map(function($value) {
+                                    return is_numeric($value) ? round($value, 3) : $value;
+                                }, $this->invoiceTotals->toArray());
+                                
+                $expectedTotals = array_map(function($value) {
+                                    return is_numeric($value) ? round($value, 3) : $value;
+                                }, $calculatedTotals->toArray());
+                
                 if ($providedTotals !== $expectedTotals) {
                     throw new InvalidArgumentException('Invoice totals do not match calculated values from line items');
                 }
