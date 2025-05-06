@@ -224,8 +224,8 @@ class JoFotaraService
 
                 $calculatedTotals
                     ->setTaxExclusiveAmount($amountBeforeDiscount) // correct
-                    ->setTaxInclusiveAmount($taxInclusiveAmount)
                     ->setDiscountTotalAmount($discountTotalAmount)
+                    ->setTaxInclusiveAmount($taxInclusiveAmount)
                     ->setTaxTotalAmount($taxTotalAmount)
                     ->setPayableAmount($payableAmount);
 
