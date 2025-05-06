@@ -217,7 +217,7 @@ class InvoiceTotals implements ValidatableSection
         }
 
         // Validate relationships between amounts
-        if ($this->taxInclusiveAmount < $this->taxExclusiveAmount) {
+        if ($this->taxInclusiveAmount < ($this->taxExclusiveAmount - $this->discountTotalAmount)) {
             throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
         }
         if ($this->payableAmount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
