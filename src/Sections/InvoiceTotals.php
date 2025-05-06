@@ -99,9 +99,10 @@ class InvoiceTotals implements ValidatableSection
             throw new InvalidArgumentException('Tax total amount cannot be negative');
         }
 
-        if ($this->taxInclusiveAmount > 0 && ($this->taxExclusiveAmount - $this->discountTotalAmount + $taxAmount) > $this->taxInclusiveAmount) {
+        if (round($this->taxInclusiveAmount, 3) > 0 && round($this->taxExclusiveAmount - $this->discountTotalAmount + $taxAmount, 3) > round($this->taxInclusiveAmount, 3)) {
+
             throw new InvalidArgumentException('Tax total amount would make tax inclusive amount invalid');
-        }
+        } 
 
         $this->taxTotalAmount = $taxAmount;
 
@@ -217,7 +218,7 @@ class InvoiceTotals implements ValidatableSection
         }
 
         // Validate relationships between amounts
-        if ($this->taxInclusiveAmount < $this->taxExclusiveAmount) {
+        if ($this->taxInclusiveAmount < ($this->taxExclusiveAmount - $this->discountTotalAmount)) {
             throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
         }
         if ($this->payableAmount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
