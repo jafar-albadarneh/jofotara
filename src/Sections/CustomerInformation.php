@@ -10,7 +10,7 @@ class CustomerInformation implements ValidatableSection
 {
     use XmlHelperTrait;
 
-    private const array VALID_CITY_CODES = [
+    private const VALID_CITY_CODES = [
         'JO-BA', // Balqa
         'JO-MN', // Ma'an
         'JO-MD', // Madaba
