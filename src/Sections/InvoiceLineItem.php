@@ -213,7 +213,9 @@ class InvoiceLineItem implements ValidatableSection
     {
         $amountAfterDiscount = $this->getAmountAfterDiscount();
 
-        return $this->taxCategory === 'S' ? $amountAfterDiscount * ($this->taxPercent / 100) : 0;
+        //return $this->taxCategory === 'S' ? $amountAfterDiscount * ($this->taxPercent / 100) : 0;
+        return $this->taxCategory === 'S' ? round($amountAfterDiscount * ($this->taxPercent / 100), 3) : 0;
+
     }
 
     /**
