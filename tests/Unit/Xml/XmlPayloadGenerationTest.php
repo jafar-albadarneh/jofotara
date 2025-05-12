@@ -142,7 +142,7 @@ test('it throws exception when manually set totals do not match item calculation
 
     $invoice->supplierIncomeSource('12345678');
 
-    // Add item with tax exclusive amount of 100 and 16% tax
+    // Add item with tax-exclusive amount of 100 and 16% tax
     $invoice->items()
         ->addItem('1')
         ->setQuantity(1)
@@ -159,6 +159,84 @@ test('it throws exception when manually set totals do not match item calculation
 
     expect(fn () => $invoice->generateXml())
         ->toThrow(InvalidArgumentException::class, 'Invoice totals do not match calculated values from line items');
+});
+
+test('it checks the validity of the calculation when a discount is applied (manual)', function () {
+    $invoice = new JoFotaraService('test-client-id', 'test-client-secret');
+    // Set up basic invoice info
+    $invoice->basicInformation()
+        ->setInvoiceId('INV-001')
+        ->setUuid('123e4567-e89b-12d3-a456-426614174000')
+        ->setIssueDate('16-02-2025')
+        ->setInvoiceType('income')
+        ->cash();
+    // Add required seller info
+    $invoice->sellerInformation()
+        ->setName('Seller Company')
+        ->setTin('12345678');
+    // Add required buyer info
+    $invoice->customerInformation()
+        ->setId('987654321', 'TIN')
+        ->setName('Customer 123');
+    $invoice->supplierIncomeSource('12345678');
+    // Add item with tax-exclusive amount of 100 and 16% tax and 20% discount
+    $invoice->items()
+        ->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(100.0)
+        ->setDiscount(20) // 20% discount
+        ->setDescription('Test Item')
+        ->tax(16);
+
+    // manually-calculate totals and expect no exceptions
+    expect(function () use ($invoice) {
+        $invoice->invoiceTotals()
+            ->setTaxExclusiveAmount(100)
+            ->setTaxInclusiveAmount(116 - 20)
+            ->setDiscountTotalAmount(20)
+            ->setTaxTotalAmount(16)
+            ->setPayableAmount(116 - 20);
+    })->not->toThrow(InvalidArgumentException::class);
+});
+
+test('it checks the validity of the calculation when a discount is applied (auto)', function () {
+    $invoice = new JoFotaraService('test-client-id', 'test-client-secret');
+    // Set up basic invoice info
+    $invoice->basicInformation()
+        ->setInvoiceId('INV-001')
+        ->setUuid('123e4567-e89b-12d3-a456-426614174000')
+        ->setIssueDate('16-02-2025')
+        ->setInvoiceType('income')
+        ->cash();
+    // Add required seller info
+    $invoice->sellerInformation()
+        ->setName('Seller Company')
+        ->setTin('12345678');
+    // Add required buyer info
+    $invoice->customerInformation()
+        ->setId('987654321', 'TIN')
+        ->setName('Customer 123');
+    $invoice->supplierIncomeSource('12345678');
+    // Add item with tax-exclusive amount of 100 and 16% tax and 20% discount
+    $invoice->items()
+        ->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(105.5)
+        ->setDiscount(10.3) // 20% discount
+        ->setDescription('Test Item')
+        ->tax(16);
+
+    // expect the totals to be auto-calculated correctly
+    expect(function () use ($invoice) {
+        $invoice->invoiceTotals();
+    })->not->toThrow(InvalidArgumentException::class)
+        ->and($invoice->invoiceTotals()->toArray())->toBe([
+            'taxExclusiveAmount' => 105.5,
+            'taxInclusiveAmount' => 110.432,
+            'discountTotalAmount' => 10.3,
+            'taxTotalAmount' => 15.232,
+            'payableAmount' => 110.432,
+        ]);
 });
 
 // Success Cases

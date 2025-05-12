@@ -223,10 +223,14 @@ class JoFotaraService
                 $payableAmount = $taxInclusiveAmount;
 
                 $calculatedTotals
-                    ->setTaxExclusiveAmount($amountBeforeDiscount) // correct
-                    ->setTaxInclusiveAmount($taxInclusiveAmount)
+                    // Set the base amount
+                    ->setTaxExclusiveAmount($amountBeforeDiscount)
+                    // Set the discount amount
                     ->setDiscountTotalAmount($discountTotalAmount)
+                    // Set the tax amount
                     ->setTaxTotalAmount($taxTotalAmount)
+                    // Set the final payable amount
+                    ->setTaxInclusiveAmount($taxInclusiveAmount)
                     ->setPayableAmount($payableAmount);
 
                 $providedTotals = $this->invoiceTotals->toArray();
