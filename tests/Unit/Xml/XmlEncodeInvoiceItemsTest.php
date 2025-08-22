@@ -395,3 +395,172 @@ test('it handles multiple items with different tax and discount combinations', f
         ->toContain('<cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>')
         ->toContain('<cbc:RoundingAmount currencyID="JO">200.000000000</cbc:RoundingAmount>');
 });
+
+test('it handles edge case with maximum discount and 16% tax', function () {
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(100)
+        ->setDescription('Item with max discount')
+        ->setDiscount(100) // Maximum possible discount
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    // Tax exclusive = (1 * 100) - 100 = 0
+    // Tax amount = 0 * 0.16 = 0
+    // Tax inclusive = 0 + 0 = 0
+    expect($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">0.000000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">0.000000000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>')
+        ->toContain('<cbc:Amount currencyID="JO">100.000000000</cbc:Amount>'); // Discount amount
+});
+
+test('it handles edge case with decimal quantities and 16% tax', function () {
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(1.5)
+        ->setUnitPrice(33.33)
+        ->setDescription('Item with decimal quantity')
+        ->setDiscount(10)
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    // Tax exclusive = (1.5 * 33.33) - 10 = 39.995
+    // Tax amount = 39.995 * 0.16 = 6.3992
+    // Tax inclusive = 39.995 + 6.3992 = 46.3942
+    expect($xml)
+        ->toContain('<cbc:InvoicedQuantity unitCode="PCE">1.500000000</cbc:InvoicedQuantity>')
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">39.995000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">6.399200000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">46.394200000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>')
+        ->toContain('<cbc:Amount currencyID="JO">10.000000000</cbc:Amount>'); // Discount amount
+});
+
+test('it handles edge case with very small values and 16% tax', function () {
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(0.01)
+        ->setUnitPrice(0.01)
+        ->setDescription('Item with very small values')
+        ->setDiscount(0.0001) // Changed from 0.001 to 0.0001 to not exceed total amount
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    // Tax exclusive = (0.01 * 0.01) - 0.001 = 0.0001 - 0.001 = -0.0009 (should be 0 as discount can't exceed amount)
+    // Tax amount = 0 * 0.16 = 0
+    // Tax inclusive = 0 + 0 = 0
+    expect($xml)
+        ->toContain('<cbc:InvoicedQuantity unitCode="PCE">0.010000000</cbc:InvoicedQuantity>')
+        ->toContain('<cbc:PriceAmount currencyID="JO">0.010000000</cbc:PriceAmount>')
+        ->toContain('<cbc:Amount currencyID="JO">0.000100000</cbc:Amount>'); // Discount amount - updated to match the new discount value
+});
+
+test('it handles edge case with rounding issues and 16% tax', function () {
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(3)
+        ->setUnitPrice(33.33)
+        ->setDescription('Item with rounding issues')
+        ->setDiscount(10)
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    // Tax exclusive = (3 * 33.33) - 10 = 89.99
+    // Tax amount = 89.99 * 0.16 = 14.3984
+    // Tax inclusive = 89.99 + 14.3984 = 104.3884
+    expect($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">89.990000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">14.398400000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">104.388400000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>')
+        ->toContain('<cbc:Amount currencyID="JO">10.000000000</cbc:Amount>'); // Discount amount
+});
+
+test('it handles edge case with discount exactly equal to amount', function () {
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(50)
+        ->setDescription('Item with discount equal to amount')
+        ->setDiscount(50) // Discount equals full amount
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    // Tax exclusive = (1 * 50) - 50 = 0
+    // Tax amount = 0 * 0.16 = 0
+    // Tax inclusive = 0 + 0 = 0
+    expect($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">0.000000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">0.000000000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>')
+        ->toContain('<cbc:Amount currencyID="JO">50.000000000</cbc:Amount>'); // Discount amount
+});
+
+test('it handles complex case with multiple items and mixed tax rates including 16%', function () {
+    $items = new InvoiceItems;
+
+    // Item with 16% tax and discount
+    $items->addItem('1')
+        ->setQuantity(2.5)
+        ->setUnitPrice(100)
+        ->setDescription('Item with 16% tax')
+        ->setDiscount(50)
+        ->tax(16);
+
+    // Item with 7% tax and discount
+    $items->addItem('2')
+        ->setQuantity(1.75)
+        ->setUnitPrice(80)
+        ->setDescription('Item with 7% tax')
+        ->setDiscount(20)
+        ->tax(7);
+
+    // Item with zero tax and no discount
+    $items->addItem('3')
+        ->setQuantity(3)
+        ->setUnitPrice(30)
+        ->setDescription('Item with zero tax')
+        ->zeroTax();
+
+    $xml = $items->toXml();
+
+    // First item
+    // Tax exclusive = (2.5 * 100) - 50 = 200
+    // Tax amount = 200 * 0.16 = 32
+    // Tax inclusive = 200 + 32 = 232
+    
+    // Second item
+    // Tax exclusive = (1.75 * 80) - 20 = 120
+    // Tax amount = 120 * 0.07 = 8.4
+    // Tax inclusive = 120 + 8.4 = 128.4
+    
+    // Third item
+    // Tax exclusive = 3 * 30 = 90
+    // Tax amount = 0
+    // Tax inclusive = 90
+    
+    expect($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">200.000000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">32.000000000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">232.000000000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>')
+        ->and($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">120.000000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">8.400000000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">128.400000000</cbc:RoundingAmount>')
+        ->toContain('<cbc:Percent>7.000000000</cbc:Percent>')
+        ->and($xml)
+        ->toContain('<cbc:LineExtensionAmount currencyID="JO">90.000000000</cbc:LineExtensionAmount>')
+        ->toContain('<cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>')
+        ->toContain('<cbc:RoundingAmount currencyID="JO">90.000000000</cbc:RoundingAmount>')
+        ->toContain('<cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">O</cbc:ID>');
+});

@@ -139,7 +139,7 @@ class JoFotaraService
                     $discountTotalAmount += $item->getDiscount();
                 }
 
-                $taxInclusiveAmount = $amountBeforeDiscount + $totalTaxAmount - $discountTotalAmount;
+                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $totalTaxAmount;
                 $payableAmount = $taxInclusiveAmount;
 
                 $this->invoiceTotals
