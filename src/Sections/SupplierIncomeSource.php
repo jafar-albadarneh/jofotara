@@ -4,11 +4,12 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class SupplierIncomeSource implements ValidatableSection
 {
-    use XmlHelperTrait;
+    use WithValidationConfigs, XmlHelperTrait;
 
     /**
      * The seller's sequence of income source (activity)
@@ -71,6 +72,10 @@ class SupplierIncomeSource implements ValidatableSection
      */
     public function validateSection(): void
     {
+        if (! $this->validationsEnabled) {
+            return;
+        }
+
         if (! isset($this->sequenceId)) {
             throw new InvalidArgumentException('Supplier income source sequence ID is required');
         }
