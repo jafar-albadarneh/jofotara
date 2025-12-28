@@ -9,7 +9,7 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class InvoiceTotals implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private float $taxExclusiveAmount = 0.0;
 
@@ -20,7 +20,7 @@ class InvoiceTotals implements ValidatableSection
     private float $taxTotalAmount = 0.0;
 
     private float $payableAmount = 0.0;
-    
+
     /**
      * Get the payable amount
      */
@@ -237,7 +237,7 @@ class InvoiceTotals implements ValidatableSection
             if ($this->payableAmount == 0) {
                 throw new InvalidArgumentException('Payable amount is required');
             }
-            
+
             // Validate relationships between amounts
             if ($this->taxInclusiveAmount < $this->taxExclusiveAmount - $this->discountTotalAmount) {
                 throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');

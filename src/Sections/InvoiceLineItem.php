@@ -9,7 +9,7 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class InvoiceLineItem implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private string $id;
 
@@ -26,12 +26,12 @@ class InvoiceLineItem implements ValidatableSection
     private float $taxPercent = 16.0; // Default to 16%
 
     private string $unitCode = 'PCE'; // Default to piece
-    
+
     public function __construct(string $id)
     {
         $this->id = $id;
     }
-    
+
     /**
      * Set the quantity
      *
@@ -328,10 +328,10 @@ class InvoiceLineItem implements ValidatableSection
     public function validateSection(): void
     {
         // Skip detailed validations if validations are disabled
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         // Validate required fields
         if (! isset($this->quantity)) {
             throw new InvalidArgumentException('Item quantity is required');

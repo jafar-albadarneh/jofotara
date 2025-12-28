@@ -10,8 +10,8 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class BasicInvoiceInformation implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
-    
+    use WithValidationConfigs, XmlHelperTrait;
+
     /**
      * Invoice type constants mapping to payment method codes
      *
@@ -90,7 +90,7 @@ class BasicInvoiceInformation implements ValidatableSection
             if ($this->validationsEnabled && ! $dateTime) {
                 throw new InvalidArgumentException('Date must be in the format dd-mm-yyyy');
             }
-            $this->issueDate = $dateTime ?: new DateTime();
+            $this->issueDate = $dateTime ?: new DateTime;
         } else {
             $this->issueDate = $date;
         }
@@ -276,7 +276,7 @@ class BasicInvoiceInformation implements ValidatableSection
         // Basic invoice elements
         $xml[] = sprintf('<cbc:ID>%s</cbc:ID>', $this->escapeXml($this->invoiceId ?? ''));
         $xml[] = sprintf('<cbc:UUID>%s</cbc:UUID>', $this->escapeXml($this->uuid ?? ''));
-        $xml[] = sprintf('<cbc:IssueDate>%s</cbc:IssueDate>', ($this->issueDate ?? new DateTime())->format('Y-m-d'));
+        $xml[] = sprintf('<cbc:IssueDate>%s</cbc:IssueDate>', ($this->issueDate ?? new DateTime)->format('Y-m-d'));
 
         // Check if invoice type and payment method are set
         if (! isset($this->paymentMethod)) {
@@ -347,10 +347,10 @@ class BasicInvoiceInformation implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         if (! isset($this->invoiceId)) {
             throw new InvalidArgumentException('Invoice ID is required');
         }

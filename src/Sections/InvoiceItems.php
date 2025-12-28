@@ -9,32 +9,33 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class InvoiceItems implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private array $items = [];
-    
+
     /**
      * Enable or disable validations for this section
      *
-     * @param bool $enabled Whether validations should be enabled
+     * @param  bool  $enabled  Whether validations should be enabled
      * @return $this
      */
     public function setValidationsEnabled(bool $enabled): self
     {
         $this->validationsEnabled = $enabled;
-        
+
         // Also pass the validation flag to all items
         foreach ($this->items as $item) {
             $item->setValidationsEnabled($enabled);
         }
-        
+
         return $this;
     }
-    
+
     /**
      * Add a new line item to the invoice
      *
      * @param  string  $id  Unique serial number for this line item
+     *
      * @throws InvalidArgumentException If item with the same ID already exists and validations are enabled
      */
     public function addItem(string $id): InvoiceLineItem
@@ -64,6 +65,7 @@ class InvoiceItems implements ValidatableSection
      * Convert all invoice items to XML
      *
      * @return string The XML representation
+     *
      * @throws InvalidArgumentException If no items exist and validations are enabled
      */
     public function toXml(): string
@@ -79,7 +81,7 @@ class InvoiceItems implements ValidatableSection
 
         return implode("\n", $xml);
     }
-    
+
     /**
      * Validate the section
      *
@@ -87,14 +89,14 @@ class InvoiceItems implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         if (empty($this->items)) {
             throw new InvalidArgumentException('At least one invoice item is required');
         }
-        
+
         // Validate each item
         foreach ($this->items as $item) {
             $item->validateSection();
@@ -114,5 +116,4 @@ class InvoiceItems implements ValidatableSection
 
         return $items;
     }
-
 }

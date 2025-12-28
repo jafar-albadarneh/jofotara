@@ -4,9 +4,6 @@ namespace JBadarneh\JoFotara\Traits;
 
 trait WithValidationConfigs
 {
-    /**
-     * @var bool
-     */
     protected bool $validationsEnabled = true;
 
     /**

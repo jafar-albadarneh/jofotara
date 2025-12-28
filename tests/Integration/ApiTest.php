@@ -65,7 +65,8 @@ test('it encodes invoice XML to base64', function () {
 
 // Mocked API tests
 test('it sends invoice successfully using mocked service', function () {
-    $service = new class('test-client-id', 'test-client-secret') extends JoFotaraService {
+    $service = new class('test-client-id', 'test-client-secret') extends JoFotaraService
+    {
         public array $lastRequest = [];
 
         protected function executeRequest(string $url, array $headers, string $body): array
@@ -136,7 +137,8 @@ test('it sends invoice successfully using mocked service', function () {
 });
 
 test('it handles authentication error using mocked service', function () {
-    $service = new class('wrong-id', 'wrong-secret') extends JoFotaraService {
+    $service = new class('wrong-id', 'wrong-secret') extends JoFotaraService
+    {
         protected function executeRequest(string $url, array $headers, string $body): array
         {
             return [
@@ -206,17 +208,16 @@ test('it allows inconsistent totals when validations are disabled', function () 
         ->setTaxInclusiveAmount(116.0)
         ->setTaxTotalAmount(16.0)
         ->setPayableAmount(116.0);
-        
+
     // Then directly modify the payable amount to an inconsistent value
     // This bypasses the setter validation but will still be in the XML
     $reflection = new \ReflectionClass($invoice->invoiceTotals());
     $property = $reflection->getProperty('payableAmount');
-    $property->setAccessible(true);
     $property->setValue($invoice->invoiceTotals(), 50.0);
 
     // This should not throw an exception because validations are disabled
     $encodedInvoice = $invoice->encodeInvoice();
-    
+
     $decodedInvoice = base64_decode($encodedInvoice);
     // Verify the XML contains our inconsistent values
     expect($decodedInvoice)->toContain('<cbc:PayableAmount currencyID="JO">50.000000000</cbc:PayableAmount>');
@@ -260,12 +261,11 @@ test('it throws exception with inconsistent totals when validations are enabled'
         ->setTaxInclusiveAmount(116.0)
         ->setTaxTotalAmount(16.0)
         ->setPayableAmount(116.0);
-        
+
     // Then directly modify the payable amount to an inconsistent value
     // This bypasses the setter validation
     $reflection = new \ReflectionClass($invoice->invoiceTotals());
     $property = $reflection->getProperty('payableAmount');
-    $property->setAccessible(true);
     $property->setValue($invoice->invoiceTotals(), 50.0);
 
     // This should throw an exception during XML generation because validations are enabled

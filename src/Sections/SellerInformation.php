@@ -9,7 +9,7 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class SellerInformation implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private static ?array $defaults = null;
 
@@ -17,7 +17,7 @@ class SellerInformation implements ValidatableSection
 
     private string $name;
     // Country code is fixed to JO per documentation
-    
+
     public function __construct()
     {
         if (self::$defaults) {
@@ -48,7 +48,7 @@ class SellerInformation implements ValidatableSection
             'name' => $name,
         ];
     }
-    
+
     /**
      * Clear configured defaults
      */
@@ -159,10 +159,10 @@ class SellerInformation implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         if (! isset($this->tin)) {
             throw new InvalidArgumentException('Seller TIN is required');
         }

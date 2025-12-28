@@ -9,8 +9,8 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class CustomerInformation implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
-    
+    use WithValidationConfigs, XmlHelperTrait;
+
     private const VALID_CITY_CODES = [
         'JO-BA', // Balqa
         'JO-MN', // Ma'an
@@ -237,7 +237,7 @@ class CustomerInformation implements ValidatableSection
             'tin' => $this->tin,
         ];
     }
-    
+
     /**
      * Validate the section
      *
@@ -245,10 +245,10 @@ class CustomerInformation implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         if ($this->id === null || $this->idType === null) {
             throw new InvalidArgumentException('Customer ID and ID type are required');
         }
