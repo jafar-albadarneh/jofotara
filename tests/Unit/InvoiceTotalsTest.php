@@ -223,14 +223,14 @@ test('it handles edge case with very small values', function () {
 
 test('it handles edge case with rounding issues', function () {
     $totals = new InvoiceTotals;
-    
+
     // This represents a case where tax calculation might have rounding issues
     // Tax exclusive: 33.33
     // Discount: 3.33
     // Net amount: 30.00
     // Tax at 16%: 4.80
     // Tax inclusive: 34.80
-    
+
     $totals->setTaxExclusiveAmount(33.33)
         ->setDiscountTotalAmount(3.33)
         ->setTaxInclusiveAmount(34.80)
@@ -250,7 +250,7 @@ test('it handles edge case with rounding issues', function () {
 
 test('it handles edge case with multiple items and mixed tax rates', function () {
     $totals = new InvoiceTotals;
-    
+
     // This represents a case with multiple items:
     // Item 1: 100 with 16% tax = 16 tax
     // Item 2: 200 with 0% tax = 0 tax
@@ -260,7 +260,7 @@ test('it handles edge case with multiple items and mixed tax rates', function ()
     // Net amount: 315
     // Total tax: 19.5
     // Tax inclusive: 334.5
-    
+
     $totals->setTaxExclusiveAmount(350)
         ->setDiscountTotalAmount(35)
         ->setTaxInclusiveAmount(334.5)
@@ -283,33 +283,33 @@ test('it validates tax inclusive amount is consistent with tax exclusive and tax
     $totals->setTaxExclusiveAmount(100)
         ->setDiscountTotalAmount(0)
         ->setTaxTotalAmount(16);
-    
+
     // Tax inclusive should be 116 (100 + 16), but we're setting it to 115
     expect(fn () => $totals->setTaxInclusiveAmount(115))->not()->toThrow(
         InvalidArgumentException::class
     );
-    
+
     // Set payableAmount to ensure validation passes
     // Payable amount must be >= taxInclusiveAmount - discountTotalAmount
     // In this case, taxInclusiveAmount = 115, discountTotalAmount = 0, so payableAmount must be >= 115
     $totals->setPayableAmount(115);
-    
+
     // This should still pass validation because tax inclusive amount only needs to be
     // greater than or equal to tax exclusive - discount
     $totals->validateSection();
-    
+
     // But if we set it too low, it should fail
     $totals2 = new InvoiceTotals;
     $totals2->setTaxExclusiveAmount(100)
         ->setDiscountTotalAmount(0)
         ->setTaxInclusiveAmount(100)
         ->setPayableAmount(100);
-    
+
     // Create a new instance for testing the exception
     $totals3 = new InvoiceTotals;
     $totals3->setTaxExclusiveAmount(100)
         ->setDiscountTotalAmount(0);
-        
+
     // Now test with an invalid value
     expect(fn () => $totals3->setTaxInclusiveAmount(99))->toThrow(
         InvalidArgumentException::class,

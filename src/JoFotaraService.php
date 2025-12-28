@@ -34,7 +34,7 @@ class JoFotaraService
     private string $clientId;
 
     private string $clientSecret;
-    
+
     private bool $validationsEnabled = true;
 
     public function __construct(string $clientId, string $clientSecret, bool $enableValidations = true)
@@ -172,7 +172,7 @@ class JoFotaraService
     private function validateSections(): void
     {
         // Always check required sections regardless of validation flag
-        
+
         // Validate credit invoice requirements before other validations
         if ($this->basicInfo->isCreditInvoice()) {
             if (empty($this->reasonForReturn)) {
@@ -201,19 +201,19 @@ class JoFotaraService
         if (! $this->invoiceTotals) {
             throw new InvalidArgumentException('Invoice totals are required');
         }
-        
+
         // Skip detailed validations if validations are disabled
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         // Perform detailed validations only if validations are enabled
         $this->basicInfo->validateSection();
-        
+
         if ($this->basicInfo->isCreditInvoice() && $this->reasonForReturn) {
             $this->reasonForReturn->validateSection();
         }
-        
+
         $this->sellerInfo->validateSection();
         // Validate customer information if set
         if ($this->customerInfo) {
@@ -228,7 +228,7 @@ class JoFotaraService
             $paymentMethod = $this->basicInfo->getPaymentMethod();
             // Check if receivable (codes: 021, 022, 023)
             $isReceivable = in_array($paymentMethod, ['021', '022', '023']);
-            
+
             // Check threshold
             $payableAmount = $this->invoiceTotals->getPayableAmount();
             $isOverThreshold = $payableAmount > 10000;
@@ -399,9 +399,9 @@ class JoFotaraService
     /**
      * Execute the HTTP request
      *
-     * @param string $url The URL to send the request to
-     * @param array $headers The HTTP headers
-     * @param string $body The request body
+     * @param  string  $url  The URL to send the request to
+     * @param  array  $headers  The HTTP headers
+     * @param  string  $body  The request body
      * @return array [response, statusCode, error]
      */
     protected function executeRequest(string $url, array $headers, string $body): array

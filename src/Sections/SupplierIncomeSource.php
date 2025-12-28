@@ -9,12 +9,11 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class SupplierIncomeSource implements ValidatableSection
 {
-    use XmlHelperTrait, WithValidationConfigs;
+    use WithValidationConfigs, XmlHelperTrait;
 
     /**
      * The seller's sequence of income source (activity)
      */
-    
     public function __construct(private string $sequenceId)
     {
         $this->sequenceId = $sequenceId;
@@ -31,7 +30,7 @@ class SupplierIncomeSource implements ValidatableSection
 
         return $this;
     }
-    
+
     /**
      * Convert the seller supplier party information to XML
      *
@@ -73,10 +72,10 @@ class SupplierIncomeSource implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if (!$this->validationsEnabled) {
+        if (! $this->validationsEnabled) {
             return;
         }
-        
+
         if (! isset($this->sequenceId)) {
             throw new InvalidArgumentException('Supplier income source sequence ID is required');
         }

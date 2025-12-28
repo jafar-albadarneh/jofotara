@@ -537,17 +537,17 @@ test('it handles complex case with multiple items and mixed tax rates including 
     // Tax exclusive = (2.5 * 100) - 50 = 200
     // Tax amount = 200 * 0.16 = 32
     // Tax inclusive = 200 + 32 = 232
-    
+
     // Second item
     // Tax exclusive = (1.75 * 80) - 20 = 120
     // Tax amount = 120 * 0.07 = 8.4
     // Tax inclusive = 120 + 8.4 = 128.4
-    
+
     // Third item
     // Tax exclusive = 3 * 30 = 90
     // Tax amount = 0
     // Tax inclusive = 90
-    
+
     expect($xml)
         ->toContain('<cbc:LineExtensionAmount currencyID="JO">200.000000000</cbc:LineExtensionAmount>')
         ->toContain('<cbc:TaxAmount currencyID="JO">32.000000000</cbc:TaxAmount>')
