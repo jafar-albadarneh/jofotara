@@ -4,11 +4,12 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class InvoiceLineItem implements ValidatableSection
 {
-    use XmlHelperTrait;
+    use XmlHelperTrait, WithValidationConfigs;
 
     private string $id;
 
@@ -25,22 +26,22 @@ class InvoiceLineItem implements ValidatableSection
     private float $taxPercent = 16.0; // Default to 16%
 
     private string $unitCode = 'PCE'; // Default to piece
-
+    
     public function __construct(string $id)
     {
         $this->id = $id;
     }
-
+    
     /**
      * Set the quantity
      *
      * @param  float  $quantity  The quantity of items
      *
-     * @throws InvalidArgumentException If quantity is not positive
+     * @throws InvalidArgumentException If quantity is not positive and validations are enabled
      */
     public function setQuantity(float $quantity): self
     {
-        if ($quantity <= 0) {
+        if ($this->validationsEnabled && $quantity <= 0) {
             throw new InvalidArgumentException('Quantity must be greater than 0');
         }
         $this->quantity = $quantity;
@@ -49,15 +50,15 @@ class InvoiceLineItem implements ValidatableSection
     }
 
     /**
-     * Set the unit price before tax
+     * Set the unit price
      *
      * @param  float  $price  The unit price
      *
-     * @throws InvalidArgumentException If price is negative
+     * @throws InvalidArgumentException If price is negative and validations are enabled
      */
     public function setUnitPrice(float $price): self
     {
-        if ($price < 0) {
+        if ($this->validationsEnabled && $price < 0) {
             throw new InvalidArgumentException('Unit price cannot be negative');
         }
         $this->unitPrice = $price;
@@ -70,16 +71,18 @@ class InvoiceLineItem implements ValidatableSection
      *
      * @param  float  $amount  The discount amount
      *
-     * @throws InvalidArgumentException If discount is negative or greater than total amount
+     * @throws InvalidArgumentException If discount is negative or greater than total amount and validations are enabled
      */
     public function setDiscount(float $amount): self
     {
-        if ($amount < 0) {
-            throw new InvalidArgumentException('Discount amount cannot be negative');
-        }
+        if ($this->validationsEnabled) {
+            if ($amount < 0) {
+                throw new InvalidArgumentException('Discount amount cannot be negative');
+            }
 
-        if (isset($this->quantity) && isset($this->unitPrice) && $amount > ($this->quantity * $this->unitPrice)) {
-            throw new InvalidArgumentException('Discount cannot be greater than total amount');
+            if (isset($this->quantity) && isset($this->unitPrice) && $amount > ($this->quantity * $this->unitPrice)) {
+                throw new InvalidArgumentException('Discount cannot be greater than total amount');
+            }
         }
 
         $this->discount = $amount;
@@ -91,9 +94,14 @@ class InvoiceLineItem implements ValidatableSection
      * Set the item description
      *
      * @param  string  $description  The item description
+     *
+     * @throws InvalidArgumentException If description is empty and validations are enabled
      */
     public function setDescription(string $description): self
     {
+        if ($this->validationsEnabled && empty($description)) {
+            throw new InvalidArgumentException('Description cannot be empty');
+        }
         $this->description = $description;
 
         return $this;
@@ -319,6 +327,11 @@ class InvoiceLineItem implements ValidatableSection
      */
     public function validateSection(): void
     {
+        // Skip detailed validations if validations are disabled
+        if (!$this->validationsEnabled) {
+            return;
+        }
+        
         // Validate required fields
         if (! isset($this->quantity)) {
             throw new InvalidArgumentException('Item quantity is required');

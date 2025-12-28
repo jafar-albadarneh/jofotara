@@ -4,12 +4,13 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class CustomerInformation implements ValidatableSection
 {
-    use XmlHelperTrait;
-
+    use XmlHelperTrait, WithValidationConfigs;
+    
     private const VALID_CITY_CODES = [
         'JO-BA', // Balqa
         'JO-MN', // Ma'an
@@ -45,12 +46,12 @@ class CustomerInformation implements ValidatableSection
      * @param  string  $id  The identification number
      * @param  string  $type  The type of ID (NIN, PN, or TIN)
      *
-     * @throws InvalidArgumentException If the ID type is invalid
+     * @throws InvalidArgumentException If the ID type is invalid and validations are enabled
      */
     public function setId(string $id, string $type): self
     {
         $validTypes = ['NIN', 'PN', 'TIN'];
-        if (! in_array($type, $validTypes)) {
+        if ($this->validationsEnabled && ! in_array($type, $validTypes)) {
             throw new InvalidArgumentException('ID type must be one of: '.implode(', ', $validTypes));
         }
 
@@ -86,6 +87,14 @@ class CustomerInformation implements ValidatableSection
         $this->cityCode = $code;
 
         return $this;
+    }
+
+    /**
+     * Get the customer's name
+     */
+    public function getName(): ?string
+    {
+        return $this->name;
     }
 
     /**
@@ -228,27 +237,20 @@ class CustomerInformation implements ValidatableSection
             'tin' => $this->tin,
         ];
     }
-
+    
     /**
-     * Validate that all required fields are set and valid
+     * Validate the section
      *
      * @throws InvalidArgumentException If validation fails
      */
     public function validateSection(): void
     {
-        // Validate required ID and type
-        if (! isset($this->id) || ! isset($this->idType)) {
-            throw new InvalidArgumentException('Customer ID and type are required');
+        if (!$this->validationsEnabled) {
+            return;
         }
-
-        // Validate ID type
-        if (! in_array($this->idType, ['NIN', 'PN', 'TIN'])) {
-            throw new InvalidArgumentException('Invalid customer ID type. Must be NIN, PN, or TIN');
-        }
-
-        // Validate city code if set
-        if ($this->cityCode !== null && ! in_array($this->cityCode, self::VALID_CITY_CODES)) {
-            throw new InvalidArgumentException('Invalid city code');
+        
+        if ($this->id === null || $this->idType === null) {
+            throw new InvalidArgumentException('Customer ID and ID type are required');
         }
     }
 }

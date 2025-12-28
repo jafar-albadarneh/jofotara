@@ -5,12 +5,13 @@ namespace JBadarneh\JoFotara\Sections;
 use DateTime;
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class BasicInvoiceInformation implements ValidatableSection
 {
-    use XmlHelperTrait;
-
+    use XmlHelperTrait, WithValidationConfigs;
+    
     /**
      * Invoice type constants mapping to payment method codes
      *
@@ -80,16 +81,16 @@ class BasicInvoiceInformation implements ValidatableSection
      *
      * @param  string|DateTime  $date  The invoice issue date
      *
-     * @throws InvalidArgumentException If the date format is invalid
+     * @throws InvalidArgumentException If the date format is invalid and validations are enabled
      */
     public function setIssueDate(string|DateTime $date): self
     {
         if (is_string($date)) {
             $dateTime = DateTime::createFromFormat('d-m-Y', $date);
-            if (! $dateTime) {
+            if ($this->validationsEnabled && ! $dateTime) {
                 throw new InvalidArgumentException('Date must be in the format dd-mm-yyyy');
             }
-            $this->issueDate = $dateTime;
+            $this->issueDate = $dateTime ?: new DateTime();
         } else {
             $this->issueDate = $date;
         }
@@ -102,16 +103,24 @@ class BasicInvoiceInformation implements ValidatableSection
      *
      * @param  string  $type  The invoice type ('income', 'general_sales', or 'special_sales')
      *
-     * @throws InvalidArgumentException If the invoice type is invalid
+     * @throws InvalidArgumentException If the invoice type is invalid and validations are enabled
      */
     public function setInvoiceType(string $type): self
     {
-        if (! array_key_exists($type, self::INVOICE_TYPES)) {
+        if ($this->validationsEnabled && ! array_key_exists($type, self::INVOICE_TYPES)) {
             throw new InvalidArgumentException("Invoice type must be one of: 'income', 'general_sales', 'special_sales'");
         }
         $this->invoiceType = $type;
 
         return $this;
+    }
+
+    /**
+     * Get the payment method
+     */
+    public function getPaymentMethod(): ?string
+    {
+        return $this->paymentMethod;
     }
 
     /**
@@ -250,22 +259,24 @@ class BasicInvoiceInformation implements ValidatableSection
      */
     public function toXml(): string
     {
-        if (! isset($this->invoiceId)) {
-            throw new InvalidArgumentException('Invoice ID is required');
-        }
-        if (! isset($this->uuid)) {
-            throw new InvalidArgumentException('UUID is required');
-        }
-        if (! isset($this->issueDate)) {
-            throw new InvalidArgumentException('Issue date is required');
+        if ($this->validationsEnabled) {
+            if (! isset($this->invoiceId)) {
+                throw new InvalidArgumentException('Invoice ID is required');
+            }
+            if (! isset($this->uuid)) {
+                throw new InvalidArgumentException('UUID is required');
+            }
+            if (! isset($this->issueDate)) {
+                throw new InvalidArgumentException('Issue date is required');
+            }
         }
 
         $xml = [];
 
         // Basic invoice elements
-        $xml[] = sprintf('<cbc:ID>%s</cbc:ID>', $this->escapeXml($this->invoiceId));
-        $xml[] = sprintf('<cbc:UUID>%s</cbc:UUID>', $this->escapeXml($this->uuid));
-        $xml[] = sprintf('<cbc:IssueDate>%s</cbc:IssueDate>', $this->issueDate->format('Y-m-d'));
+        $xml[] = sprintf('<cbc:ID>%s</cbc:ID>', $this->escapeXml($this->invoiceId ?? ''));
+        $xml[] = sprintf('<cbc:UUID>%s</cbc:UUID>', $this->escapeXml($this->uuid ?? ''));
+        $xml[] = sprintf('<cbc:IssueDate>%s</cbc:IssueDate>', ($this->issueDate ?? new DateTime())->format('Y-m-d'));
 
         // Check if invoice type and payment method are set
         if (! isset($this->paymentMethod)) {
@@ -336,6 +347,10 @@ class BasicInvoiceInformation implements ValidatableSection
      */
     public function validateSection(): void
     {
+        if (!$this->validationsEnabled) {
+            return;
+        }
+        
         if (! isset($this->invoiceId)) {
             throw new InvalidArgumentException('Invoice ID is required');
         }

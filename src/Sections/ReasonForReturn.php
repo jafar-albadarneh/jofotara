@@ -4,14 +4,15 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class ReasonForReturn implements ValidatableSection
 {
-    use XmlHelperTrait;
+    use XmlHelperTrait, WithValidationConfigs;
 
     private ?string $reason = null;
-
+    
     /**
      * Set the reason for return (required)
      *
@@ -23,7 +24,7 @@ class ReasonForReturn implements ValidatableSection
 
         return $this;
     }
-
+    
     /**
      * Convert the reason for return to XML
      *
@@ -57,6 +58,10 @@ class ReasonForReturn implements ValidatableSection
      */
     public function validateSection(): void
     {
+        if (!$this->validationsEnabled) {
+            return;
+        }
+        
         if ($this->reason === null) {
             throw new InvalidArgumentException('Return reason is required');
         }

@@ -381,6 +381,28 @@ The SDK includes comprehensive validation to ensure your invoice meets JoFotara 
 
 Validation errors throw `InvalidArgumentException` with descriptive messages to help you quickly identify and fix issues.
 
+### Bypassing Validations
+
+For advanced use cases where you need complete manual control over invoice data, you can bypass the built-in validations:
+
+```php
+// Initialize the SDK with validations disabled
+$invoice = new JoFotaraService(
+    clientId: 'your-client-id',
+    clientSecret: 'your-client-secret',
+    enableValidations: false
+);
+```
+
+When validations are bypassed:
+
+- Required sections are still checked (basic info, seller info, items, invoice totals)
+- Detailed field validations are skipped
+- No automatic calculations or consistency checks between line items and totals
+- You have full control over all amount values
+
+**Note:** Use this feature with caution. Incorrect invoice data may be rejected by the JoFotara API.
+
 ## Development Testing
 
 ```bash
