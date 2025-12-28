@@ -279,10 +279,10 @@ class BasicInvoiceInformation implements ValidatableSection
         $xml[] = sprintf('<cbc:IssueDate>%s</cbc:IssueDate>', ($this->issueDate ?? new DateTime)->format('Y-m-d'));
 
         // Check if invoice type and payment method are set
-        if (! isset($this->paymentMethod)) {
+        if ($this->validationsEnabled && ! isset($this->paymentMethod)) {
             throw new InvalidArgumentException('Payment method is required. Use cash(), receivable(), or setPaymentMethod() to set it.');
         }
-        $xml[] = sprintf('<cbc:InvoiceTypeCode name="%s">%s</cbc:InvoiceTypeCode>', $this->escapeXml($this->paymentMethod), $this->isCreditInvoice ? '381' : '388');
+        $xml[] = sprintf('<cbc:InvoiceTypeCode name="%s">%s</cbc:InvoiceTypeCode>', $this->escapeXml($this->paymentMethod ?? ''), $this->isCreditInvoice ? '381' : '388');
 
         // Optional note
         if ($this->note !== null) {
