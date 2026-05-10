@@ -211,7 +211,7 @@ test('it allows inconsistent totals when validations are disabled', function () 
 
     // Then directly modify the payable amount to an inconsistent value
     // This bypasses the setter validation but will still be in the XML
-    $reflection = new \ReflectionClass($invoice->invoiceTotals());
+    $reflection = new ReflectionClass($invoice->invoiceTotals());
     $property = $reflection->getProperty('payableAmount');
     $property->setValue($invoice->invoiceTotals(), 50.0);
 
@@ -264,7 +264,7 @@ test('it throws exception with inconsistent totals when validations are enabled'
 
     // Then directly modify the payable amount to an inconsistent value
     // This bypasses the setter validation
-    $reflection = new \ReflectionClass($invoice->invoiceTotals());
+    $reflection = new ReflectionClass($invoice->invoiceTotals());
     $property = $reflection->getProperty('payableAmount');
     $property->setValue($invoice->invoiceTotals(), 50.0);
 
