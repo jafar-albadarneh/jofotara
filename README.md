@@ -106,24 +106,34 @@ $invoice->basicInformation()
 
 ### Tax Handling
 
-The SDK supports various tax scenarios:
+The XML shape depends on the invoice type (the seller's tax registration class
+per spec):
+
+- `general_sales` (012/022) — VAT-registered. Lines carry a single VAT
+  `TaxSubtotal`. Rates allowed: `{1, 2, 3, 4, 5, 7, 8, 10, 16}` (spec p. 69).
+- `special_sales` (013/023) — registered for special sales tax. Lines carry
+  **two** `TaxSubtotal` blocks: one for the special tax (absolute amount) and
+  one for the general VAT.
+- `income` (011/021) — not registered for any sales tax. No `TaxTotal` blocks
+  anywhere; setting `tax()` on a line is rejected.
 
 ```php
-// 1. Standard VAT (16%)
+// 1. Standard VAT (general sales)
+$invoice->basicInformation()->setInvoiceType('general_sales')->cash();
 $invoice->items()
     ->addItem('1')
     ->setQuantity(1)
     ->setUnitPrice(100.0)
     ->tax(16);
 
-// 2. Tax Exempt
+// 2. Tax Exempt (category Z)
 $invoice->items()
     ->addItem('2')
     ->setQuantity(1)
     ->setUnitPrice(50.0)
     ->taxExempted();
 
-// 3. Zero-rated (e.g., exports)
+// 3. Zero-rated, e.g. exports (category O)
 $invoice->items()
     ->addItem('3')
     ->setQuantity(1)
@@ -137,7 +147,25 @@ $invoice->items()
     ->setUnitPrice(200.0)
     ->setDiscount(20.0)
     ->tax(16);
+
+// 5. Special Sales Tax (e.g. tobacco, fuel)
+$invoice->basicInformation()->setInvoiceType('special_sales')->cash();
+$invoice->items()
+    ->addItem('5')
+    ->setQuantity(10)
+    ->setUnitPrice(50.0)
+    ->setDiscount(5.0)
+    ->setDescription('Tobacco')
+    ->tax(10)                       // general VAT 10%
+    ->setSpecialTaxAmount(10.0);    // absolute special tax (spec p. 67 uses OTH)
+// Or set the rate and let the package compute the absolute amount:
+//   ->setSpecialTaxRate(2.02);
 ```
+
+For `special_sales` lines, the general tax is computed as
+`(lineNet + specialTax) × generalRate` (spec p. 68), and the document-level
+`TaxTotal` carries only the sum of general tax — `totalSpecialTaxesAmount`
+is reconstructed by the JoFotara backend from the per-line OTH subtotals.
 
 ### Response Handling
 

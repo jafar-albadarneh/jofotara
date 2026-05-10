@@ -712,4 +712,3 @@ test('special sales line with zero special tax keeps the single-VAT subtotal sha
         // Single subtotal — outer TaxAmount equals VAT subtotal TaxAmount = 32 / 10 = 3.2
         ->toContain('<cbc:Percent>16.000000000</cbc:Percent>');
 });
-
