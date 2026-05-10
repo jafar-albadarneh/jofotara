@@ -184,6 +184,13 @@ class InvoiceLineItem implements ValidatableSection
      *
      * @throws InvalidArgumentException If category or percentage is invalid
      */
+    /**
+     * Tax rates allowed for the standard 'S' category per spec p. 69.
+     * The Jordan e-invoicing spec only enumerates these specific general
+     * tax rates; any other value is rejected by the JoFotara backend.
+     */
+    private const ALLOWED_GENERAL_TAX_RATES = [1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 8.0, 10.0, 16.0];
+
     public function setTaxCategory(string $category, ?float $percent = null): self
     {
         $validCategories = ['Z', 'O', 'S'];
@@ -195,8 +202,11 @@ class InvoiceLineItem implements ValidatableSection
             if ($percent === null) {
                 throw new InvalidArgumentException('Tax percentage is required for standard rate category');
             }
-            if ($percent <= 0) {
-                throw new InvalidArgumentException('Invalid tax rate for standard category');
+            if ($this->validationsEnabled && ! in_array((float) $percent, self::ALLOWED_GENERAL_TAX_RATES, true)) {
+                $allowed = implode(', ', array_map('intval', self::ALLOWED_GENERAL_TAX_RATES));
+                throw new InvalidArgumentException(
+                    "Tax rate {$percent} is not allowed for standard category. Spec p. 69 allows: {$allowed}."
+                );
             }
             $this->taxPercent = $percent;
         } else {
@@ -529,9 +539,12 @@ class InvoiceLineItem implements ValidatableSection
             throw new InvalidArgumentException('Invalid tax category');
         }
 
-        // Validate tax percent for standard rate
-        if ($this->taxCategory === 'S' && ($this->taxPercent <= 0 || $this->taxPercent > 16)) {
-            throw new InvalidArgumentException('Tax percentage must be between 0 and 16 for standard rate');
+        // Validate tax percent for standard rate against spec p. 69 enumeration.
+        if ($this->taxCategory === 'S' && ! in_array((float) $this->taxPercent, self::ALLOWED_GENERAL_TAX_RATES, true)) {
+            $allowed = implode(', ', array_map('intval', self::ALLOWED_GENERAL_TAX_RATES));
+            throw new InvalidArgumentException(
+                "Tax rate {$this->taxPercent} is not allowed for standard category. Spec p. 69 allows: {$allowed}."
+            );
         }
     }
 }

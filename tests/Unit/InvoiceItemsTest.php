@@ -75,7 +75,7 @@ test('it validates tax category and percentage', function () {
     expect(fn () => $items->addItem('1')->setTaxCategory('X'))
         ->toThrow(InvalidArgumentException::class, 'Tax category must be Z, O, or S')
         ->and(fn () => $items->addItem('2')->setTaxCategory('S', 0))
-        ->toThrow(InvalidArgumentException::class, 'Invalid tax rate for standard category')
+        ->toThrow(InvalidArgumentException::class, 'is not allowed for standard category')
         ->and(fn () => $items->addItem('3')->setTaxCategory('S'))
         ->toThrow(InvalidArgumentException::class, 'Tax percentage is required for standard rate category');
 
@@ -85,6 +85,24 @@ test('it validates tax category and percentage', function () {
 
     $item = $items->addItem('5')->setTaxCategory('Z');
     expect($item->toArray()['taxPercent'])->toBe(0.0);
+});
+
+test('it restricts standard tax rates to the spec p. 69 enumeration', function () {
+    $items = new InvoiceItems;
+
+    // Rates not in {1, 2, 3, 4, 5, 7, 8, 10, 16} are rejected.
+    expect(fn () => $items->addItem('1')->setTaxCategory('S', 6))
+        ->toThrow(InvalidArgumentException::class, 'is not allowed for standard category')
+        ->and(fn () => $items->addItem('2')->setTaxCategory('S', 14))
+        ->toThrow(InvalidArgumentException::class, 'is not allowed for standard category')
+        ->and(fn () => $items->addItem('3')->setTaxCategory('S', 17))
+        ->toThrow(InvalidArgumentException::class, 'is not allowed for standard category');
+
+    // All allowed rates pass.
+    foreach ([1, 2, 3, 4, 5, 7, 8, 10, 16] as $i => $rate) {
+        $item = $items->addItem("ok-{$i}")->setTaxCategory('S', $rate);
+        expect($item->toArray()['taxPercent'])->toBe((float) $rate);
+    }
 });
 
 test('it defaults to standard rate tax category', function () {
@@ -140,7 +158,7 @@ test('it validates tax rate in tax() method', function () {
     $items = new InvoiceItems;
 
     expect(fn () => $items->addItem('1')->tax(0))
-        ->toThrow(InvalidArgumentException::class, 'Invalid tax rate for standard category');
+        ->toThrow(InvalidArgumentException::class, 'is not allowed for standard category');
 });
 
 test('it calculates tax exclusive amount correctly', function () {
