@@ -29,6 +29,20 @@ class InvoiceLineItem implements ValidatableSection
 
     private ?string $invoiceType = null;
 
+    /**
+     * Absolute special tax amount on this line. The JoFotara spec (p. 67)
+     * emits special tax as an absolute amount in the OTH TaxSubtotal — there
+     * is no <cbc:Percent> element for it. Stored as the source of truth.
+     */
+    private float $specialTaxAmount = 0.0;
+
+    /**
+     * Optional special tax rate, used purely for ergonomics. When set, the
+     * absolute amount is computed lazily as net * rate / 100 so callers can
+     * set rate before quantity/price are finalised.
+     */
+    private ?float $specialTaxRate = null;
+
     public function __construct(string $id)
     {
         $this->id = $id;
@@ -229,25 +243,111 @@ class InvoiceLineItem implements ValidatableSection
     }
 
     /**
-     * Calculate the tax amount for this line item
+     * Set the absolute special tax amount for this line.
+     *
+     * Special tax is only meaningful on special_sales (013/023) invoices.
+     * Calling on any other invoice type is a no-op at XML level, but the
+     * amount remains stored.
+     *
+     * @throws InvalidArgumentException If the amount is negative
+     */
+    public function setSpecialTaxAmount(float $amount): self
+    {
+        if ($this->validationsEnabled && $amount < 0) {
+            throw new InvalidArgumentException('Special tax amount cannot be negative');
+        }
+
+        $this->specialTaxAmount = $amount;
+        $this->specialTaxRate = null;
+
+        return $this;
+    }
+
+    /**
+     * Set the special tax rate as a percentage. The absolute amount is
+     * computed lazily from the line net (price * quantity - discount).
+     *
+     * @throws InvalidArgumentException If the rate is negative
+     */
+    public function setSpecialTaxRate(float $rate): self
+    {
+        if ($this->validationsEnabled && $rate < 0) {
+            throw new InvalidArgumentException('Special tax rate cannot be negative');
+        }
+
+        $this->specialTaxRate = $rate;
+
+        return $this;
+    }
+
+    /**
+     * Calculate the special tax amount for this line item.
+     *
+     * Returns 0 unless the invoice type is special_sales — special tax is
+     * undefined for income and general_sales.
+     */
+    public function getSpecialTaxAmount(): float
+    {
+        if ($this->invoiceType !== 'special_sales') {
+            return 0.0;
+        }
+
+        if ($this->specialTaxRate !== null) {
+            return $this->getAmountAfterDiscount() * ($this->specialTaxRate / 100);
+        }
+
+        return $this->specialTaxAmount;
+    }
+
+    /**
+     * Calculate the general (VAT) tax amount for this line item.
+     *
+     * - income: 0 (income invoices carry no tax — spec p. 17)
+     * - special_sales: (net + special) * generalRate / 100 (spec p. 68 formula)
+     * - default: net * generalRate / 100
+     */
+    public function getGeneralTaxAmount(): float
+    {
+        if ($this->invoiceType === 'income') {
+            return 0.0;
+        }
+
+        if ($this->taxCategory !== 'S') {
+            return 0.0;
+        }
+
+        $base = $this->getAmountAfterDiscount();
+        if ($this->invoiceType === 'special_sales') {
+            $base += $this->getSpecialTaxAmount();
+        }
+
+        return $base * ($this->taxPercent / 100);
+    }
+
+    /**
+     * Calculate the tax amount for this line item.
+     *
+     * Backward-compatible alias for getGeneralTaxAmount(); callers that
+     * pre-date special tax support continue to receive the general (VAT)
+     * tax amount.
      *
      * @throws InvalidArgumentException If quantity or unit price is not set
      */
     public function getTaxAmount(): float
     {
-        $amountAfterDiscount = $this->getAmountAfterDiscount();
-
-        return $this->taxCategory === 'S' ? $amountAfterDiscount * ($this->taxPercent / 100) : 0;
+        return $this->getGeneralTaxAmount();
     }
 
     /**
-     * Calculate the total amount including tax
+     * Calculate the total amount including tax (net + special + general).
      *
      * @throws InvalidArgumentException If quantity or unit price is not set
      */
     public function getTaxInclusiveAmount(): float
     {
-        return $this->getAmountAfterDiscount() + $this->getTaxAmount();
+        return $this->getAmountAfterDiscount()
+            + $this->getSpecialTaxAmount()
+            + $this->getGeneralTaxAmount();
     }
 
     /**
@@ -283,23 +383,67 @@ class InvoiceLineItem implements ValidatableSection
         );
 
         // Income invoices (011/021) carry no line-level TaxTotal per spec p. 19.
-        // Other types (general_sales, special_sales, or unset) keep the VAT TaxTotal block.
+        // Other types (general_sales, special_sales, or unset) emit the TaxTotal block.
         if ($this->invoiceType !== 'income') {
+            $specialTaxAmount = $this->getSpecialTaxAmount();
+            $generalTaxAmount = $this->getGeneralTaxAmount();
+            $isSpecialSales = $this->invoiceType === 'special_sales' && $specialTaxAmount > 0;
+
+            // Outer <cbc:TaxAmount> carries general tax only per spec p. 68.
+            // For non-special invoices, general tax equals taxAmount.
+            $outerTaxAmount = $isSpecialSales ? $generalTaxAmount : $taxAmount;
+            // <cbc:RoundingAmount> is net + special + general per spec p. 68.
+            $outerRoundingAmount = $isSpecialSales
+                ? $taxExclusiveAmount + $specialTaxAmount + $generalTaxAmount
+                : $taxInclusiveAmount;
+
             $xml[] = '    <cac:TaxTotal>';
-            $xml[] = sprintf('        <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
-            $xml[] = sprintf('        <cbc:RoundingAmount currencyID="JO">%.9f</cbc:RoundingAmount>', $taxInclusiveAmount);
-            $xml[] = '        <cac:TaxSubtotal>';
-            $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
-            $xml[] = '            <cac:TaxCategory>';
-            $xml[] = sprintf('                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">%s</cbc:ID>',
-                $this->escapeXml($this->taxCategory)
-            );
-            $xml[] = sprintf('                <cbc:Percent>%.9f</cbc:Percent>', $this->taxPercent);
-            $xml[] = '                <cac:TaxScheme>';
-            $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>';
-            $xml[] = '                </cac:TaxScheme>';
-            $xml[] = '            </cac:TaxCategory>';
-            $xml[] = '        </cac:TaxSubtotal>';
+            $xml[] = sprintf('        <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $outerTaxAmount);
+            $xml[] = sprintf('        <cbc:RoundingAmount currencyID="JO">%.9f</cbc:RoundingAmount>', $outerRoundingAmount);
+
+            if ($isSpecialSales) {
+                // Spec p. 67: first TaxSubtotal is the special tax under TaxScheme OTH.
+                // No <cbc:Percent> is emitted — special tax is expressed as an absolute amount.
+                $xml[] = '        <cac:TaxSubtotal>';
+                $xml[] = sprintf('            <cbc:TaxableAmount currencyID="JO">%.9f</cbc:TaxableAmount>', $taxExclusiveAmount);
+                $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $specialTaxAmount);
+                $xml[] = '            <cac:TaxCategory>';
+                $xml[] = '                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">S</cbc:ID>';
+                $xml[] = '                <cac:TaxScheme>';
+                $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">OTH</cbc:ID>';
+                $xml[] = '                </cac:TaxScheme>';
+                $xml[] = '            </cac:TaxCategory>';
+                $xml[] = '        </cac:TaxSubtotal>';
+                // Second TaxSubtotal: general VAT.
+                $xml[] = '        <cac:TaxSubtotal>';
+                $xml[] = sprintf('            <cbc:TaxableAmount currencyID="JO">%.9f</cbc:TaxableAmount>', $taxExclusiveAmount);
+                $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $generalTaxAmount);
+                $xml[] = '            <cac:TaxCategory>';
+                $xml[] = sprintf('                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">%s</cbc:ID>',
+                    $this->escapeXml($this->taxCategory)
+                );
+                $xml[] = sprintf('                <cbc:Percent>%.9f</cbc:Percent>', $this->taxPercent);
+                $xml[] = '                <cac:TaxScheme>';
+                $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>';
+                $xml[] = '                </cac:TaxScheme>';
+                $xml[] = '            </cac:TaxCategory>';
+                $xml[] = '        </cac:TaxSubtotal>';
+            } else {
+                // General sales (012/022) or special_sales without a special-tax line: single VAT subtotal.
+                $xml[] = '        <cac:TaxSubtotal>';
+                $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
+                $xml[] = '            <cac:TaxCategory>';
+                $xml[] = sprintf('                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">%s</cbc:ID>',
+                    $this->escapeXml($this->taxCategory)
+                );
+                $xml[] = sprintf('                <cbc:Percent>%.9f</cbc:Percent>', $this->taxPercent);
+                $xml[] = '                <cac:TaxScheme>';
+                $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>';
+                $xml[] = '                </cac:TaxScheme>';
+                $xml[] = '            </cac:TaxCategory>';
+                $xml[] = '        </cac:TaxSubtotal>';
+            }
+
             $xml[] = '    </cac:TaxTotal>';
         }
 

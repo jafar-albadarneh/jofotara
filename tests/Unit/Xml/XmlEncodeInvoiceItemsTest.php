@@ -609,3 +609,107 @@ test('income invoice type set after items() are added still suppresses TaxTotal'
     expect($items->toXml())->not->toContain('<cac:TaxTotal>');
 });
 
+test('special sales invoice line item matches spec p. 69-70 Malboro example', function () {
+    // Spec p. 69-70 worked example: qty=10, price=50, discount=5, special tax = 10
+    // (absolute), general tax 10%. Expected:
+    //   LineExtensionAmount = price*qty - discount = 495.000
+    //   General tax = (495 + 10) * 10% = 50.500
+    //   RoundingAmount = 495 + 10 + 50.500 = 555.500
+    //   Two TaxSubtotal blocks: OTH (no Percent, TaxAmount=10) then VAT (Percent=10, TaxAmount=50.500).
+    $items = new InvoiceItems;
+    $items->setInvoiceType('special_sales');
+    $items->addItem('1')
+        ->setQuantity(10)
+        ->setUnitPrice(50.0)
+        ->setDescription('Malboro')
+        ->setDiscount(5.0)
+        ->tax(10)
+        ->setSpecialTaxAmount(10.0);
+
+    $expected = $this->normalizeXml(<<<'XML'
+<cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="PCE">10.000000000</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="JO">495.000000000</cbc:LineExtensionAmount>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="JO">50.500000000</cbc:TaxAmount>
+        <cbc:RoundingAmount currencyID="JO">555.500000000</cbc:RoundingAmount>
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="JO">495.000000000</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="JO">10.000000000</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">S</cbc:ID>
+                <cac:TaxScheme>
+                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">OTH</cbc:ID>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="JO">495.000000000</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="JO">50.500000000</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">S</cbc:ID>
+                <cbc:Percent>10.000000000</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:Item>
+        <cbc:Name>Malboro</cbc:Name>
+    </cac:Item>
+    <cac:Price>
+        <cbc:PriceAmount currencyID="JO">50.000000000</cbc:PriceAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:AllowanceChargeReason>DISCOUNT</cbc:AllowanceChargeReason>
+            <cbc:Amount currencyID="JO">5.000000000</cbc:Amount>
+        </cac:AllowanceCharge>
+    </cac:Price>
+</cac:InvoiceLine>
+XML);
+
+    expect($items->toXml())->toBe($expected);
+});
+
+test('special sales line accepts a rate helper which computes the absolute amount lazily', function () {
+    $items = new InvoiceItems;
+    $items->setInvoiceType('special_sales');
+    $items->addItem('1')
+        ->setQuantity(10)
+        ->setUnitPrice(50.0)
+        ->setDiscount(5.0)
+        ->setDescription('Test')
+        ->tax(10)
+        ->setSpecialTaxRate(2.020202020202); // ~ 10.00 absolute on net 495
+
+    $line = $items->getItems()['1'];
+
+    // 495 * 0.0202020... ≈ 10
+    expect(round($line->getSpecialTaxAmount(), 6))->toBe(10.0)
+        ->and(round($line->getGeneralTaxAmount(), 6))->toBe(50.5)
+        ->and(round($line->getTaxInclusiveAmount(), 6))->toBe(555.5);
+});
+
+test('special sales line with zero special tax keeps the single-VAT subtotal shape', function () {
+    // A special_sales-registered taxpayer can still have items with no special
+    // tax (e.g. office supplies on a tobacco invoice). Those lines should keep
+    // the original single-VAT-subtotal shape for backwards compatibility.
+    $items = new InvoiceItems;
+    $items->setInvoiceType('special_sales');
+    $items->addItem('1')
+        ->setQuantity(2)
+        ->setUnitPrice(10.0)
+        ->setDescription('Office paper')
+        ->tax(16);
+
+    $xml = $items->toXml();
+
+    expect($xml)
+        ->not->toContain('OTH')
+        ->toContain('<cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>')
+        // Single subtotal — outer TaxAmount equals VAT subtotal TaxAmount = 32 / 10 = 3.2
+        ->toContain('<cbc:Percent>16.000000000</cbc:Percent>');
+});
+

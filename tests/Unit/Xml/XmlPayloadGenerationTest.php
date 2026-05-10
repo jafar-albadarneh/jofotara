@@ -640,3 +640,36 @@ test('income invoice rejects a line with tax category S and a non-zero rate', fu
     expect(fn () => $invoice->generateXml())
         ->toThrow(InvalidArgumentException::class, 'Income invoices cannot have taxable line items');
 });
+
+test('special sales invoice auto-derives totals per spec p. 65 formula', function () {
+    // qty=10, price=50, discount=5, general 10%, special 10.00 absolute.
+    // exclusive = 500 (price*qty before discount)
+    // general tax = (500 - 5 + 10) * 10% = 50.50
+    // inclusive = 500 - 5 + 10 + 50.50 = 555.50 = payable
+    $invoice = new JoFotaraService('test-client-id', 'test-client-secret');
+    $invoice->basicInformation()
+        ->setInvoiceId('INV-001')
+        ->setUuid('123e4567-e89b-12d3-a456-426614174000')
+        ->setIssueDate('16-02-2025')
+        ->setInvoiceType('special_sales')
+        ->cash();
+    $invoice->sellerInformation()->setName('Seller Company')->setTin('12345678');
+    $invoice->customerInformation()->setId('987654321', 'TIN')->setName('Customer 123');
+    $invoice->supplierIncomeSource('12345678');
+    $invoice->items()
+        ->addItem('1')
+        ->setQuantity(10)
+        ->setUnitPrice(50.0)
+        ->setDescription('Malboro')
+        ->setDiscount(5.0)
+        ->tax(10)
+        ->setSpecialTaxAmount(10.0);
+
+    expect($invoice->invoiceTotals()->toArray())->toBe([
+        'taxExclusiveAmount' => 500.0,
+        'taxInclusiveAmount' => 555.5,
+        'discountTotalAmount' => 5.0,
+        'taxTotalAmount' => 50.5, // general tax only — special tax not in this field
+        'payableAmount' => 555.5,
+    ]);
+});

@@ -257,3 +257,36 @@ test('income invoice totals emit AllowanceCharge and AllowanceTotalAmount even w
         ->toContain('<cbc:Amount currencyID="JO">0.000000000</cbc:Amount>')
         ->toContain('<cbc:AllowanceTotalAmount currencyID="JO">0.000000000</cbc:AllowanceTotalAmount>');
 });
+
+test('special sales invoice totals match spec p. 66 worked example', function () {
+    // Spec p. 66: exclusive 1800.00, discount 2.00, general tax 144.48,
+    // special tax 8.00 (derived), inclusive 1950.48, payable 1950.48.
+    // Document-level TaxTotal/TaxAmount holds general tax only (spec p. 65).
+    $totals = new InvoiceTotals;
+    $totals->setInvoiceType('special_sales');
+    $totals
+        ->setTaxExclusiveAmount(1800.00)
+        ->setDiscountTotalAmount(2.00)
+        ->setTaxTotalAmount(144.48) // general tax only
+        ->setTaxInclusiveAmount(1950.48)
+        ->setPayableAmount(1950.48);
+
+    $expected = $this->normalizeXml(<<<'XML'
+<cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="JO">2.000000000</cbc:Amount>
+</cac:AllowanceCharge>
+<cac:TaxTotal>
+    <cbc:TaxAmount currencyID="JO">144.480000000</cbc:TaxAmount>
+</cac:TaxTotal>
+<cac:LegalMonetaryTotal>
+    <cbc:TaxExclusiveAmount currencyID="JO">1800.000000000</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="JO">1950.480000000</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="JO">2.000000000</cbc:AllowanceTotalAmount>
+    <cbc:PayableAmount currencyID="JO">1950.480000000</cbc:PayableAmount>
+</cac:LegalMonetaryTotal>
+XML);
+
+    expect($totals->toXml())->toBe($expected);
+});

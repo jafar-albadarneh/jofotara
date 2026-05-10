@@ -141,29 +141,38 @@ class JoFotaraService
 
             // If we have items, calculate totals from them
             if ($this->items && count($this->items->getItems()) > 0) {
+                $invoiceType = $this->basicInfo->getInvoiceType();
                 $amountBeforeDiscount = 0.0;
-                $totalTaxAmount = 0.0;
+                $totalGeneralTax = 0.0;
+                $totalSpecialTax = 0.0;
                 $discountTotalAmount = 0.0;
 
                 foreach ($this->items->getItems() as $item) {
                     $amountBeforeDiscount += $item->getAmountBeforeDiscount();
-                    $totalTaxAmount += $item->getTaxAmount();
+                    $totalGeneralTax += $item->getGeneralTaxAmount();
+                    $totalSpecialTax += $item->getSpecialTaxAmount();
                     $discountTotalAmount += $item->getDiscount();
                 }
 
                 // Income invoices carry no tax; spec p. 17: inclusive = exclusive - discount.
-                if ($this->basicInfo->getInvoiceType() === 'income') {
-                    $totalTaxAmount = 0.0;
+                if ($invoiceType === 'income') {
+                    $totalGeneralTax = 0.0;
+                    $totalSpecialTax = 0.0;
                 }
 
-                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $totalTaxAmount;
+                // Spec p. 65 for special sales / p. 17 for income / general sales mirrors:
+                //   inclusive = exclusive - discount + specialTax + generalTax = payable
+                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount
+                    + $totalSpecialTax + $totalGeneralTax;
                 $payableAmount = $taxInclusiveAmount;
 
+                // Document-level TaxTotal holds general tax only (spec p. 65). Special
+                // tax is recoverable from the per-line OTH subtotals.
                 $this->invoiceTotals
                     ->setTaxExclusiveAmount($amountBeforeDiscount)
                     ->setDiscountTotalAmount($discountTotalAmount)
                     ->setTaxInclusiveAmount($taxInclusiveAmount)
-                    ->setTaxTotalAmount($totalTaxAmount)
+                    ->setTaxTotalAmount($totalGeneralTax)
                     ->setPayableAmount($payableAmount);
             }
         }
@@ -264,23 +273,29 @@ class JoFotaraService
             if (count($items) > 0) {
                 $calculatedTotals = new InvoiceTotals;
 
+                $invoiceType = $this->basicInfo->getInvoiceType();
                 $amountBeforeDiscount = 0.0;
-                $taxTotalAmount = 0.0;
+                $generalTaxTotal = 0.0;
+                $specialTaxTotal = 0.0;
                 $discountTotalAmount = 0.0;
 
                 foreach ($items as $item) {
                     $amountBeforeDiscount += $item->getAmountBeforeDiscount();
-                    $taxTotalAmount += $item->getTaxAmount();
+                    $generalTaxTotal += $item->getGeneralTaxAmount();
+                    $specialTaxTotal += $item->getSpecialTaxAmount();
                     $discountTotalAmount += $item->getDiscount();
                 }
 
                 // Income invoices carry no tax; spec p. 17.
-                if ($this->basicInfo->getInvoiceType() === 'income') {
-                    $taxTotalAmount = 0.0;
+                if ($invoiceType === 'income') {
+                    $generalTaxTotal = 0.0;
+                    $specialTaxTotal = 0.0;
                 }
 
-                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $taxTotalAmount;
+                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount
+                    + $specialTaxTotal + $generalTaxTotal;
                 $payableAmount = $taxInclusiveAmount;
+                $taxTotalAmount = $generalTaxTotal;
 
                 $calculatedTotals
                     // Set the base amount
