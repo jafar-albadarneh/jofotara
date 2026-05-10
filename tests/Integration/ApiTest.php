@@ -22,7 +22,7 @@ test('it encodes invoice XML to base64', function () {
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     $invoice->sellerInformation()
@@ -101,7 +101,7 @@ test('it sends invoice successfully using mocked service', function () {
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     $service->sellerInformation()
@@ -154,7 +154,7 @@ test('it handles authentication error using mocked service', function () {
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
     $service->sellerInformation()->setTin('12345678')->setName('Seller');
     $service->customerInformation()->setupAnonymousCustomer();
@@ -178,7 +178,7 @@ test('it allows inconsistent totals when validations are disabled', function () 
         ->setInvoiceId('INV-002')
         ->setUuid('123e4567-e89b-12d3-a456-426614174001')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     $invoice->sellerInformation()
@@ -232,7 +232,7 @@ test('it throws exception with inconsistent totals when validations are enabled'
         ->setInvoiceId('INV-003')
         ->setUuid('123e4567-e89b-12d3-a456-426614174002')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     $invoice->sellerInformation()

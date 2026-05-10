@@ -564,3 +564,48 @@ test('it handles complex case with multiple items and mixed tax rates including 
         ->toContain('<cbc:RoundingAmount currencyID="JO">90.000000000</cbc:RoundingAmount>')
         ->toContain('<cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">O</cbc:ID>');
 });
+
+test('income invoice line items emit no TaxTotal block per spec p. 19', function () {
+    $items = new InvoiceItems;
+    $items->setInvoiceType('income');
+    $items->addItem('1')
+        ->setQuantity(33)
+        ->setUnitPrice(2.0)
+        ->setDescription('Biscuit')
+        ->setDiscount(2.0);
+
+    $expected = $this->normalizeXml(<<<'XML'
+<cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="PCE">33.000000000</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="JO">64.000000000</cbc:LineExtensionAmount>
+    <cac:Item>
+        <cbc:Name>Biscuit</cbc:Name>
+    </cac:Item>
+    <cac:Price>
+        <cbc:PriceAmount currencyID="JO">2.000000000</cbc:PriceAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:AllowanceChargeReason>DISCOUNT</cbc:AllowanceChargeReason>
+            <cbc:Amount currencyID="JO">2.000000000</cbc:Amount>
+        </cac:AllowanceCharge>
+    </cac:Price>
+</cac:InvoiceLine>
+XML);
+
+    expect($items->toXml())->toBe($expected);
+});
+
+test('income invoice type set after items() are added still suppresses TaxTotal', function () {
+    // Verifies the fan-out behaviour from InvoiceItems::setInvoiceType().
+    $items = new InvoiceItems;
+    $items->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(10.0)
+        ->setDescription('Sample');
+
+    $items->setInvoiceType('income');
+
+    expect($items->toXml())->not->toContain('<cac:TaxTotal>');
+});
+

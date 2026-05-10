@@ -182,9 +182,13 @@ class InvoiceTotals implements ValidatableSection
         }
 
         $xml = [];
+        $isIncome = $this->invoiceType === 'income';
 
-        // Discount section
-        if ($this->discountTotalAmount > 0) {
+        // Discount section.
+        // Income invoices (spec p. 17) always emit the AllowanceCharge block,
+        // even when the amount is zero, since the template includes it as a
+        // fixed structural element.
+        if ($this->discountTotalAmount > 0 || $isIncome) {
             $xml[] = '<cac:AllowanceCharge>';
             $xml[] = '    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>';
             $xml[] = '    <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>';
@@ -192,10 +196,12 @@ class InvoiceTotals implements ValidatableSection
             $xml[] = '</cac:AllowanceCharge>';
         }
 
-        // Tax total
-        $xml[] = '<cac:TaxTotal>';
-        $xml[] = sprintf('    <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $this->taxTotalAmount);
-        $xml[] = '</cac:TaxTotal>';
+        // Tax total — spec p. 17 forbids this block on income invoices entirely.
+        if (! $isIncome) {
+            $xml[] = '<cac:TaxTotal>';
+            $xml[] = sprintf('    <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $this->taxTotalAmount);
+            $xml[] = '</cac:TaxTotal>';
+        }
 
         // Monetary totals
         $xml[] = '<cac:LegalMonetaryTotal>';
@@ -205,7 +211,8 @@ class InvoiceTotals implements ValidatableSection
         $xml[] = sprintf('    <cbc:TaxInclusiveAmount currencyID="JO">%.9f</cbc:TaxInclusiveAmount>',
             $this->taxInclusiveAmount
         );
-        if ($this->discountTotalAmount > 0) {
+        // Income invoices always include AllowanceTotalAmount per spec p. 17.
+        if ($this->discountTotalAmount > 0 || $isIncome) {
             $xml[] = sprintf('    <cbc:AllowanceTotalAmount currencyID="JO">%.9f</cbc:AllowanceTotalAmount>',
                 $this->discountTotalAmount
             );

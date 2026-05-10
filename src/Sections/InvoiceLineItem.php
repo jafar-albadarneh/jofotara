@@ -282,23 +282,26 @@ class InvoiceLineItem implements ValidatableSection
             $taxExclusiveAmount
         );
 
-        // Tax information
-        $xml[] = '    <cac:TaxTotal>';
-        $xml[] = sprintf('        <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
-        $xml[] = sprintf('        <cbc:RoundingAmount currencyID="JO">%.9f</cbc:RoundingAmount>', $taxInclusiveAmount);
-        $xml[] = '        <cac:TaxSubtotal>';
-        $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
-        $xml[] = '            <cac:TaxCategory>';
-        $xml[] = sprintf('                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">%s</cbc:ID>',
-            $this->escapeXml($this->taxCategory)
-        );
-        $xml[] = sprintf('                <cbc:Percent>%.9f</cbc:Percent>', $this->taxPercent);
-        $xml[] = '                <cac:TaxScheme>';
-        $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>';
-        $xml[] = '                </cac:TaxScheme>';
-        $xml[] = '            </cac:TaxCategory>';
-        $xml[] = '        </cac:TaxSubtotal>';
-        $xml[] = '    </cac:TaxTotal>';
+        // Income invoices (011/021) carry no line-level TaxTotal per spec p. 19.
+        // Other types (general_sales, special_sales, or unset) keep the VAT TaxTotal block.
+        if ($this->invoiceType !== 'income') {
+            $xml[] = '    <cac:TaxTotal>';
+            $xml[] = sprintf('        <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
+            $xml[] = sprintf('        <cbc:RoundingAmount currencyID="JO">%.9f</cbc:RoundingAmount>', $taxInclusiveAmount);
+            $xml[] = '        <cac:TaxSubtotal>';
+            $xml[] = sprintf('            <cbc:TaxAmount currencyID="JO">%.9f</cbc:TaxAmount>', $taxAmount);
+            $xml[] = '            <cac:TaxCategory>';
+            $xml[] = sprintf('                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">%s</cbc:ID>',
+                $this->escapeXml($this->taxCategory)
+            );
+            $xml[] = sprintf('                <cbc:Percent>%.9f</cbc:Percent>', $this->taxPercent);
+            $xml[] = '                <cac:TaxScheme>';
+            $xml[] = '                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>';
+            $xml[] = '                </cac:TaxScheme>';
+            $xml[] = '            </cac:TaxCategory>';
+            $xml[] = '        </cac:TaxSubtotal>';
+            $xml[] = '    </cac:TaxTotal>';
+        }
 
         // Item description
         $xml[] = '    <cac:Item>';

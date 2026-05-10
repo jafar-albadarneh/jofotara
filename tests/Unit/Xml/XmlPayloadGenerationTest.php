@@ -6,8 +6,10 @@ use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 uses(XmlSchemaValidator::class, XmlHelperTrait::class);
 
-// Helper function to set up common invoice sections
-function setupBasicInvoice(string $invoiceType = 'income'): JoFotaraService
+// Helper function to set up common invoice sections.
+// Default is 'general_sales' because most tests below exercise VAT behavior
+// via tax(16); income invoices are not allowed to carry tax per spec p. 17.
+function setupBasicInvoice(string $invoiceType = 'general_sales'): JoFotaraService
 {
     $invoice = new JoFotaraService('test-client-id', 'test-client-secret');
 
@@ -127,7 +129,7 @@ test('it throws exception when manually set totals do not match item calculation
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     // Add required seller info
@@ -168,7 +170,7 @@ test('it checks the validity of the calculation when a discount is applied (manu
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
     // Add required seller info
     $invoice->sellerInformation()
@@ -206,7 +208,7 @@ test('it checks the validity of the calculation when a discount is applied (auto
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
     // Add required seller info
     $invoice->sellerInformation()
@@ -385,32 +387,21 @@ test('generates valid XML for cash invoice with tax exempt item', function () {
         </cac:PartyIdentification>
     </cac:Party>
 </cac:SellerSupplierParty>
-<cac:TaxTotal>
-    <cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>
-</cac:TaxTotal>
+<cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="JO">0.000000000</cbc:Amount>
+</cac:AllowanceCharge>
 <cac:LegalMonetaryTotal>
     <cbc:TaxExclusiveAmount currencyID="JO">20.000000000</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="JO">20.000000000</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="JO">0.000000000</cbc:AllowanceTotalAmount>
     <cbc:PayableAmount currencyID="JO">20.000000000</cbc:PayableAmount>
 </cac:LegalMonetaryTotal>
 <cac:InvoiceLine>
     <cbc:ID>1</cbc:ID>
     <cbc:InvoicedQuantity unitCode="PCE">2.000000000</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="JO">20.000000000</cbc:LineExtensionAmount>
-    <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>
-        <cbc:RoundingAmount currencyID="JO">20.000000000</cbc:RoundingAmount>
-        <cac:TaxSubtotal>
-            <cbc:TaxAmount currencyID="JO">0.000000000</cbc:TaxAmount>
-            <cac:TaxCategory>
-                <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5305">Z</cbc:ID>
-                <cbc:Percent>0.000000000</cbc:Percent>
-                <cac:TaxScheme>
-                    <cbc:ID schemeAgencyID="6" schemeID="UN/ECE 5153">VAT</cbc:ID>
-                </cac:TaxScheme>
-            </cac:TaxCategory>
-        </cac:TaxSubtotal>
-    </cac:TaxTotal>
     <cac:Item>
         <cbc:Name>Test Item</cbc:Name>
     </cac:Item>
@@ -529,7 +520,7 @@ test('it auto-calculates invoice totals correctly', function () {
         ->setInvoiceId('INV-001')
         ->setUuid('123e4567-e89b-12d3-a456-426614174000')
         ->setIssueDate('16-02-2025')
-        ->setInvoiceType('income')
+        ->setInvoiceType('general_sales')
         ->cash();
 
     // Add required seller info
@@ -625,4 +616,27 @@ test('it should include customer information section with empty values customerS
     expect($xml)->toContain('cac:AccountingCustomerParty')
         ->and($xml)->toContain('<cac:PartyIdentification>')
         ->and($xml)->toContain('<cbc:ID schemeID="NIN"></cbc:ID>');
+});
+
+test('income invoice rejects a line with tax category S and a non-zero rate', function () {
+    $invoice = new JoFotaraService('test-client-id', 'test-client-secret');
+    $invoice->basicInformation()
+        ->setInvoiceId('INV-001')
+        ->setUuid('123e4567-e89b-12d3-a456-426614174000')
+        ->setIssueDate('16-02-2025')
+        ->setInvoiceType('income')
+        ->cash();
+    $invoice->sellerInformation()->setName('Seller Company')->setTin('12345678');
+    $invoice->customerInformation()->setId('987654321', 'TIN')->setName('Customer 123');
+    $invoice->supplierIncomeSource('12345678');
+    $invoice->items()
+        ->addItem('1')
+        ->setQuantity(1)
+        ->setUnitPrice(100.0)
+        ->setDescription('Taxable Item')
+        ->tax(16); // illegal on income invoice
+    $invoice->invoiceTotals();
+
+    expect(fn () => $invoice->generateXml())
+        ->toThrow(InvalidArgumentException::class, 'Income invoices cannot have taxable line items');
 });

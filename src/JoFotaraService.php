@@ -151,6 +151,11 @@ class JoFotaraService
                     $discountTotalAmount += $item->getDiscount();
                 }
 
+                // Income invoices carry no tax; spec p. 17: inclusive = exclusive - discount.
+                if ($this->basicInfo->getInvoiceType() === 'income') {
+                    $totalTaxAmount = 0.0;
+                }
+
                 $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $totalTaxAmount;
                 $payableAmount = $taxInclusiveAmount;
 
@@ -225,6 +230,19 @@ class JoFotaraService
         $this->items->validateSection();
         $this->invoiceTotals->validateSection();
 
+        // Income invoices (spec pp. 17-19) cannot carry tax. Reject any line
+        // that is categorized 'S' with a non-zero rate.
+        if ($this->basicInfo->getInvoiceType() === 'income') {
+            foreach ($this->items->getItems() as $item) {
+                $state = $item->toArray();
+                if ($state['taxCategory'] === 'S' && $state['taxPercent'] > 0) {
+                    throw new InvalidArgumentException(
+                        "Income invoices cannot have taxable line items. Item '{$state['id']}' uses category 'S' at {$state['taxPercent']}%. Use zeroTax() / taxExempted() (category 'O' or 'Z') instead."
+                    );
+                }
+            }
+        }
+
         // Validate customer name requirement (Cross-section validation)
         if ($this->customerInfo) {
             $paymentMethod = $this->basicInfo->getPaymentMethod();
@@ -254,6 +272,11 @@ class JoFotaraService
                     $amountBeforeDiscount += $item->getAmountBeforeDiscount();
                     $taxTotalAmount += $item->getTaxAmount();
                     $discountTotalAmount += $item->getDiscount();
+                }
+
+                // Income invoices carry no tax; spec p. 17.
+                if ($this->basicInfo->getInvoiceType() === 'income') {
+                    $taxTotalAmount = 0.0;
                 }
 
                 $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $taxTotalAmount;

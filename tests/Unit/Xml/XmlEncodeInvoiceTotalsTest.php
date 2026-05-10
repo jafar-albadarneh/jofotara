@@ -210,3 +210,50 @@ test('it generates XML with multiple items and mixed tax rates', function () {
         ->toContain('<cbc:AllowanceTotalAmount currencyID="JO">35.000000000</cbc:AllowanceTotalAmount>')
         ->toContain('<cbc:PayableAmount currencyID="JO">334.500000000</cbc:PayableAmount>');
 });
+
+test('income invoice totals match spec p. 17 (no TaxTotal, AllowanceCharge always present)', function () {
+    // Spec p. 17 example: discount 2.00, exclusive 66.00, inclusive 64.00, payable 64.00.
+    $totals = new InvoiceTotals;
+    $totals->setInvoiceType('income');
+    $totals
+        ->setTaxExclusiveAmount(66.00)
+        ->setDiscountTotalAmount(2.00)
+        ->setTaxInclusiveAmount(64.00)
+        ->setTaxTotalAmount(0.00)
+        ->setPayableAmount(64.00);
+
+    $expected = $this->normalizeXml(<<<'XML'
+<cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="JO">2.000000000</cbc:Amount>
+</cac:AllowanceCharge>
+<cac:LegalMonetaryTotal>
+    <cbc:TaxExclusiveAmount currencyID="JO">66.000000000</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="JO">64.000000000</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="JO">2.000000000</cbc:AllowanceTotalAmount>
+    <cbc:PayableAmount currencyID="JO">64.000000000</cbc:PayableAmount>
+</cac:LegalMonetaryTotal>
+XML);
+
+    expect($totals->toXml())->toBe($expected);
+});
+
+test('income invoice totals emit AllowanceCharge and AllowanceTotalAmount even when discount is zero', function () {
+    $totals = new InvoiceTotals;
+    $totals->setInvoiceType('income');
+    $totals
+        ->setTaxExclusiveAmount(50.00)
+        ->setDiscountTotalAmount(0.00)
+        ->setTaxInclusiveAmount(50.00)
+        ->setTaxTotalAmount(0.00)
+        ->setPayableAmount(50.00);
+
+    $xml = $totals->toXml();
+
+    expect($xml)
+        ->not->toContain('<cac:TaxTotal>')
+        ->toContain('<cac:AllowanceCharge>')
+        ->toContain('<cbc:Amount currencyID="JO">0.000000000</cbc:Amount>')
+        ->toContain('<cbc:AllowanceTotalAmount currencyID="JO">0.000000000</cbc:AllowanceTotalAmount>');
+});
