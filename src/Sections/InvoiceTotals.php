@@ -21,6 +21,21 @@ class InvoiceTotals implements ValidatableSection
 
     private float $payableAmount = 0.0;
 
+    private ?string $invoiceType = null;
+
+    /**
+     * Set the invoice type context for this totals section.
+     *
+     * Drives XML shape: income invoices omit <cac:TaxTotal> entirely
+     * (spec p. 17); general/special sales keep it.
+     */
+    public function setInvoiceType(?string $type): self
+    {
+        $this->invoiceType = $type;
+
+        return $this;
+    }
+
     /**
      * Get the payable amount
      */

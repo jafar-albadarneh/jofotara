@@ -13,6 +13,8 @@ class InvoiceItems implements ValidatableSection
 
     private array $items = [];
 
+    private ?string $invoiceType = null;
+
     /**
      * Enable or disable validations for this section
      *
@@ -26,6 +28,20 @@ class InvoiceItems implements ValidatableSection
         // Also pass the validation flag to all items
         foreach ($this->items as $item) {
             $item->setValidationsEnabled($enabled);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set the invoice type context and fan it out to all child line items.
+     */
+    public function setInvoiceType(?string $type): self
+    {
+        $this->invoiceType = $type;
+
+        foreach ($this->items as $item) {
+            $item->setInvoiceType($type);
         }
 
         return $this;
@@ -46,6 +62,7 @@ class InvoiceItems implements ValidatableSection
 
         $item = new InvoiceLineItem($id);
         $item->setValidationsEnabled($this->validationsEnabled);
+        $item->setInvoiceType($this->invoiceType);
         $this->items[$id] = $item;
 
         return $item;

@@ -27,9 +27,25 @@ class InvoiceLineItem implements ValidatableSection
 
     private string $unitCode = 'PCE'; // Default to piece
 
+    private ?string $invoiceType = null;
+
     public function __construct(string $id)
     {
         $this->id = $id;
+    }
+
+    /**
+     * Set the invoice type context for this line item.
+     *
+     * Used to switch XML shape per spec: income invoices emit no <cac:TaxTotal>;
+     * special_sales emits dual <cac:TaxSubtotal> (OTH + VAT); general_sales keeps
+     * the existing single VAT subtotal.
+     */
+    public function setInvoiceType(?string $type): self
+    {
+        $this->invoiceType = $type;
+
+        return $this;
     }
 
     /**

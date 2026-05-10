@@ -106,6 +106,7 @@ class JoFotaraService
         if (! $this->items) {
             $this->items = new InvoiceItems;
             $this->items->setValidationsEnabled($this->validationsEnabled);
+            $this->items->setInvoiceType($this->basicInfo->getInvoiceType());
         }
 
         return $this->items;
@@ -136,6 +137,7 @@ class JoFotaraService
         if (! $this->invoiceTotals) {
             $this->invoiceTotals = new InvoiceTotals;
             $this->invoiceTotals->setValidationsEnabled($this->validationsEnabled);
+            $this->invoiceTotals->setInvoiceType($this->basicInfo->getInvoiceType());
 
             // If we have items, calculate totals from them
             if ($this->items && count($this->items->getItems()) > 0) {
@@ -280,6 +282,16 @@ class JoFotaraService
 
     public function generateXml(): string
     {
+        // Re-sync invoice type into items and totals in case the user set the
+        // invoice type after calling items()/invoiceTotals() for the first time.
+        $invoiceType = $this->basicInfo->getInvoiceType();
+        if ($this->items) {
+            $this->items->setInvoiceType($invoiceType);
+        }
+        if ($this->invoiceTotals) {
+            $this->invoiceTotals->setInvoiceType($invoiceType);
+        }
+
         // Validate sections before generating XML
         // This will respect the validationsEnabled flag
         $this->validateSections();

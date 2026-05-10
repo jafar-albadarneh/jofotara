@@ -116,6 +116,16 @@ class BasicInvoiceInformation implements ValidatableSection
     }
 
     /**
+     * Get the invoice type
+     *
+     * Used by other sections (line items, totals) to switch XML shape per spec.
+     */
+    public function getInvoiceType(): ?string
+    {
+        return $this->invoiceType;
+    }
+
+    /**
      * Get the payment method
      */
     public function getPaymentMethod(): ?string
