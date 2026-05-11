@@ -4,11 +4,12 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class SellerInformation implements ValidatableSection
 {
-    use XmlHelperTrait;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private static ?array $defaults = null;
 
@@ -65,7 +66,7 @@ class SellerInformation implements ValidatableSection
      */
     public function setTin(string $tin): self
     {
-        if (empty(trim($tin))) {
+        if ($this->validationsEnabled && empty(trim($tin))) {
             throw new InvalidArgumentException('TIN cannot be empty');
         }
         $this->tin = $tin;
@@ -82,7 +83,7 @@ class SellerInformation implements ValidatableSection
      */
     public function setName(string $name): self
     {
-        if (empty(trim($name))) {
+        if ($this->validationsEnabled && empty(trim($name))) {
             throw new InvalidArgumentException('Seller name cannot be empty');
         }
         $this->name = $name;
@@ -158,6 +159,10 @@ class SellerInformation implements ValidatableSection
      */
     public function validateSection(): void
     {
+        if (! $this->validationsEnabled) {
+            return;
+        }
+
         if (! isset($this->tin)) {
             throw new InvalidArgumentException('Seller TIN is required');
         }

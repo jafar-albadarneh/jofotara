@@ -4,11 +4,12 @@ namespace JBadarneh\JoFotara\Sections;
 
 use InvalidArgumentException;
 use JBadarneh\JoFotara\Contracts\ValidatableSection;
+use JBadarneh\JoFotara\Traits\WithValidationConfigs;
 use JBadarneh\JoFotara\Traits\XmlHelperTrait;
 
 class InvoiceTotals implements ValidatableSection
 {
-    use XmlHelperTrait;
+    use WithValidationConfigs, XmlHelperTrait;
 
     private float $taxExclusiveAmount = 0.0;
 
@@ -21,6 +22,14 @@ class InvoiceTotals implements ValidatableSection
     private float $payableAmount = 0.0;
 
     /**
+     * Get the payable amount
+     */
+    public function getPayableAmount(): float
+    {
+        return $this->payableAmount;
+    }
+
+    /**
      * Set the total amount before tax and discounts
      *
      * @param  float  $amount  The tax exclusive amount
@@ -29,7 +38,7 @@ class InvoiceTotals implements ValidatableSection
      */
     public function setTaxExclusiveAmount(float $amount): self
     {
-        if ($amount < 0) {
+        if ($this->validationsEnabled && $amount < 0) {
             throw new InvalidArgumentException('Tax exclusive amount cannot be negative');
         }
 
@@ -47,12 +56,14 @@ class InvoiceTotals implements ValidatableSection
      */
     public function setTaxInclusiveAmount(float $amount): self
     {
-        if ($amount < 0) {
-            throw new InvalidArgumentException('Tax inclusive amount cannot be negative');
-        }
+        if ($this->validationsEnabled) {
+            if ($amount < 0) {
+                throw new InvalidArgumentException('Tax inclusive amount cannot be negative');
+            }
 
-        if ($amount < ($this->taxExclusiveAmount - $this->discountTotalAmount)) {
-            throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
+            if ($amount < ($this->taxExclusiveAmount - $this->discountTotalAmount)) {
+                throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
+            }
         }
 
         $this->taxInclusiveAmount = round($amount, 9);
@@ -73,12 +84,14 @@ class InvoiceTotals implements ValidatableSection
     {
         $amount = $amount ?? 0.0;
 
-        if ($amount < 0) {
-            throw new InvalidArgumentException('Discount total amount cannot be negative');
-        }
+        if ($this->validationsEnabled) {
+            if ($amount < 0) {
+                throw new InvalidArgumentException('Discount total amount cannot be negative');
+            }
 
-        if ($amount > $this->taxExclusiveAmount) {
-            throw new InvalidArgumentException('Discount total amount cannot be greater than tax exclusive amount');
+            if ($amount > $this->taxExclusiveAmount) {
+                throw new InvalidArgumentException('Discount total amount cannot be greater than tax exclusive amount');
+            }
         }
 
         $this->discountTotalAmount = round($amount, 9);
@@ -95,12 +108,14 @@ class InvoiceTotals implements ValidatableSection
      */
     public function setTaxTotalAmount(float $taxAmount): self
     {
-        if ($taxAmount < 0) {
-            throw new InvalidArgumentException('Tax total amount cannot be negative');
-        }
+        if ($this->validationsEnabled) {
+            if ($taxAmount < 0) {
+                throw new InvalidArgumentException('Tax total amount cannot be negative');
+            }
 
-        if ($this->taxInclusiveAmount > 0 && ($this->taxExclusiveAmount - $this->discountTotalAmount + $taxAmount) > $this->taxInclusiveAmount) {
-            throw new InvalidArgumentException('Tax total amount would make tax inclusive amount invalid');
+            if ($this->taxInclusiveAmount > 0 && ($this->taxExclusiveAmount - $this->discountTotalAmount + $taxAmount) > $this->taxInclusiveAmount) {
+                throw new InvalidArgumentException('Tax total amount would make tax inclusive amount invalid');
+            }
         }
 
         $this->taxTotalAmount = round($taxAmount, 9);
@@ -117,12 +132,14 @@ class InvoiceTotals implements ValidatableSection
      */
     public function setPayableAmount(float $amount): self
     {
-        if ($amount < 0) {
-            throw new InvalidArgumentException('Payable amount cannot be negative');
-        }
+        if ($this->validationsEnabled) {
+            if ($amount < 0) {
+                throw new InvalidArgumentException('Payable amount cannot be negative');
+            }
 
-        if ($this->taxInclusiveAmount > 0 && $amount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
-            throw new InvalidArgumentException('Payable amount cannot be less than tax inclusive amount minus discounts');
+            if ($this->taxInclusiveAmount > 0 && $amount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
+                throw new InvalidArgumentException('Payable amount cannot be less than tax inclusive amount minus discounts');
+            }
         }
 
         $this->payableAmount = round($amount, 9);
@@ -137,14 +154,16 @@ class InvoiceTotals implements ValidatableSection
      */
     public function toXml(): string
     {
-        if ($this->taxInclusiveAmount == 0) {
-            throw new InvalidArgumentException('Tax inclusive amount is required');
-        }
-        if ($this->taxExclusiveAmount == 0) {
-            throw new InvalidArgumentException('Tax exclusive amount is required');
-        }
-        if ($this->payableAmount == 0) {
-            throw new InvalidArgumentException('Payable amount is required');
+        if ($this->validationsEnabled) {
+            if ($this->taxInclusiveAmount == 0) {
+                throw new InvalidArgumentException('Tax inclusive amount is required');
+            }
+            if ($this->taxExclusiveAmount == 0) {
+                throw new InvalidArgumentException('Tax exclusive amount is required');
+            }
+            if ($this->payableAmount == 0) {
+                throw new InvalidArgumentException('Payable amount is required');
+            }
         }
 
         $xml = [];
@@ -206,22 +225,26 @@ class InvoiceTotals implements ValidatableSection
      */
     public function validateSection(): void
     {
-        if ($this->taxInclusiveAmount == 0) {
-            throw new InvalidArgumentException('Tax inclusive amount is required');
-        }
-        if ($this->taxExclusiveAmount == 0) {
-            throw new InvalidArgumentException('Tax exclusive amount is required');
-        }
-        if ($this->payableAmount == 0) {
-            throw new InvalidArgumentException('Payable amount is required');
-        }
+        if ($this->validationsEnabled) {
+            if ($this->taxInclusiveAmount == 0) {
+                throw new InvalidArgumentException('Tax inclusive amount is required');
+            }
 
-        // Validate relationships between amounts
-        if ($this->taxInclusiveAmount < $this->taxExclusiveAmount - $this->discountTotalAmount) {
-            throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
-        }
-        if ($this->payableAmount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
-            throw new InvalidArgumentException('Payable amount cannot be less than tax inclusive amount minus allowances');
+            if ($this->taxExclusiveAmount == 0) {
+                throw new InvalidArgumentException('Tax exclusive amount is required');
+            }
+
+            if ($this->payableAmount == 0) {
+                throw new InvalidArgumentException('Payable amount is required');
+            }
+
+            // Validate relationships between amounts
+            if ($this->taxInclusiveAmount < $this->taxExclusiveAmount - $this->discountTotalAmount) {
+                throw new InvalidArgumentException('Tax inclusive amount cannot be less than tax exclusive amount');
+            }
+            if ($this->payableAmount < ($this->taxInclusiveAmount - $this->discountTotalAmount)) {
+                throw new InvalidArgumentException('Payable amount cannot be less than tax inclusive amount minus allowances');
+            }
         }
     }
 }

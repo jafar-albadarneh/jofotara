@@ -35,7 +35,9 @@ class JoFotaraService
 
     private string $clientSecret;
 
-    public function __construct(string $clientId, string $clientSecret)
+    private bool $validationsEnabled = true;
+
+    public function __construct(string $clientId, string $clientSecret, bool $enableValidations = true)
     {
         if (empty($clientId) || empty($clientSecret)) {
             throw new InvalidArgumentException('JoFotara client ID and secret are required');
@@ -43,7 +45,9 @@ class JoFotaraService
 
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
+        $this->validationsEnabled = $enableValidations;
         $this->basicInfo = new BasicInvoiceInformation;
+        $this->basicInfo->setValidationsEnabled($this->validationsEnabled);
     }
 
     /**
@@ -61,6 +65,7 @@ class JoFotaraService
     {
         if (! $this->sellerInfo) {
             $this->sellerInfo = new SellerInformation;
+            $this->sellerInfo->setValidationsEnabled($this->validationsEnabled);
         }
 
         return $this->sellerInfo;
@@ -74,6 +79,7 @@ class JoFotaraService
         if (! $this->customerInfo) {
             $this->customerInfo = new CustomerInformation;
             $this->customerInfo->setId('', 'NIN');
+            $this->customerInfo->setValidationsEnabled($this->validationsEnabled);
         }
 
         return $this->customerInfo;
@@ -86,6 +92,7 @@ class JoFotaraService
     {
         if (! $this->supplierIncomeSource) {
             $this->supplierIncomeSource = new SupplierIncomeSource($sequence);
+            $this->supplierIncomeSource->setValidationsEnabled($this->validationsEnabled);
         }
 
         return $this->supplierIncomeSource;
@@ -98,6 +105,7 @@ class JoFotaraService
     {
         if (! $this->items) {
             $this->items = new InvoiceItems;
+            $this->items->setValidationsEnabled($this->validationsEnabled);
         }
 
         return $this->items;
@@ -112,6 +120,7 @@ class JoFotaraService
     {
         if (! $this->reasonForReturn) {
             $this->reasonForReturn = new ReasonForReturn;
+            $this->reasonForReturn->setValidationsEnabled($this->validationsEnabled);
         }
 
         $this->reasonForReturn->setReason($reason);
@@ -126,6 +135,7 @@ class JoFotaraService
     {
         if (! $this->invoiceTotals) {
             $this->invoiceTotals = new InvoiceTotals;
+            $this->invoiceTotals->setValidationsEnabled($this->validationsEnabled);
 
             // If we have items, calculate totals from them
             if ($this->items && count($this->items->getItems()) > 0) {
@@ -139,7 +149,7 @@ class JoFotaraService
                     $discountTotalAmount += $item->getDiscount();
                 }
 
-                $taxInclusiveAmount = $amountBeforeDiscount + $totalTaxAmount - $discountTotalAmount;
+                $taxInclusiveAmount = $amountBeforeDiscount - $discountTotalAmount + $totalTaxAmount;
                 $payableAmount = $taxInclusiveAmount;
 
                 $this->invoiceTotals
@@ -161,15 +171,13 @@ class JoFotaraService
      */
     private function validateSections(): void
     {
-        // Validate basic information first
-        $this->basicInfo->validateSection();
+        // Always check required sections regardless of validation flag
 
         // Validate credit invoice requirements before other validations
         if ($this->basicInfo->isCreditInvoice()) {
             if (empty($this->reasonForReturn)) {
                 throw new InvalidArgumentException('Credit invoices require a reason for return');
             }
-            $this->reasonForReturn->validateSection();
         }
 
         // Validate all required sections are initialized
@@ -180,6 +188,7 @@ class JoFotaraService
         // Validate customer information is initialized
         if (! $this->customerInfo) {
             $this->customerInfo = new CustomerInformation;
+            $this->customerInfo->setValidationsEnabled($this->validationsEnabled);
             $this->customerInfo->setupAnonymousCustomer();
         }
 
@@ -193,7 +202,18 @@ class JoFotaraService
             throw new InvalidArgumentException('Invoice totals are required');
         }
 
-        // Validate each section individually
+        // Skip detailed validations if validations are disabled
+        if (! $this->validationsEnabled) {
+            return;
+        }
+
+        // Perform detailed validations only if validations are enabled
+        $this->basicInfo->validateSection();
+
+        if ($this->basicInfo->isCreditInvoice() && $this->reasonForReturn) {
+            $this->reasonForReturn->validateSection();
+        }
+
         $this->sellerInfo->validateSection();
         // Validate customer information if set
         if ($this->customerInfo) {
@@ -203,8 +223,23 @@ class JoFotaraService
         $this->items->validateSection();
         $this->invoiceTotals->validateSection();
 
-        // Cross-section validation (totals matching items)
-        if ($this->items && $this->invoiceTotals) {
+        // Validate customer name requirement (Cross-section validation)
+        if ($this->customerInfo) {
+            $paymentMethod = $this->basicInfo->getPaymentMethod();
+            // Check if receivable (codes: 021, 022, 023)
+            $isReceivable = in_array($paymentMethod, ['021', '022', '023']);
+
+            // Check threshold
+            $payableAmount = $this->invoiceTotals->getPayableAmount();
+            $isOverThreshold = $payableAmount > 10000;
+
+            if (($isReceivable || $isOverThreshold) && empty($this->customerInfo->getName())) {
+                throw new InvalidArgumentException('Customer name is required for receivable invoices or invoices over 10000 JOD');
+            }
+        }
+
+        // Cross-section validation (totals matching items) - only if validations are enabled
+        if ($this->validationsEnabled && $this->items && $this->invoiceTotals) {
             $items = $this->items->getItems();
             if (count($items) > 0) {
                 $calculatedTotals = new InvoiceTotals;
@@ -246,6 +281,7 @@ class JoFotaraService
     public function generateXml(): string
     {
         // Validate sections before generating XML
+        // This will respect the validationsEnabled flag
         $this->validateSections();
 
         $xml = [];
@@ -322,24 +358,15 @@ class JoFotaraService
     {
         $encodedInvoice = $this->encodeInvoice();
 
-        $curlHandle = curl_init(self::API_URL);
-        curl_setopt_array($curlHandle, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
+        [$response, $statusCode, $error] = $this->executeRequest(
+            self::API_URL,
+            [
                 'Client-Id: '.$this->clientId,
                 'Secret-Key: '.$this->clientSecret,
                 'Content-Type: application/json',
             ],
-            CURLOPT_POSTFIELDS => json_encode([
-                'invoice' => $encodedInvoice,
-            ]),
-        ]);
-
-        $response = curl_exec($curlHandle);
-        $statusCode = curl_getinfo($curlHandle, CURLINFO_HTTP_CODE);
-        $error = curl_error($curlHandle);
-        curl_close($curlHandle);
+            json_encode(['invoice' => $encodedInvoice])
+        );
 
         if ($error) {
             throw new RuntimeException('Failed to send invoice: '.$error);
@@ -361,17 +388,37 @@ class JoFotaraService
             $result = [
                 'error' => empty($response) ?
                     'Empty response from API' :
-                    'Invalid response format from API',
-                'code' => 'RESPONSE_ERROR',
+                    'Invalid JSON response from API: '.json_last_error_msg(),
+                'raw_response' => $response,
             ];
         }
 
-        // Handle 200 and 400 responses with the JoFotaraResponse object
-        if ($statusCode !== 200 && $statusCode !== 400 && $statusCode !== 403) {
-            throw new RuntimeException('API request failed with status code '.$statusCode);
-        }
-
-        // Create a response object that can handle success, error, and auth failure responses
         return new JoFotaraResponse($result, $statusCode);
+    }
+
+    /**
+     * Execute the HTTP request
+     *
+     * @param  string  $url  The URL to send the request to
+     * @param  array  $headers  The HTTP headers
+     * @param  string  $body  The request body
+     * @return array [response, statusCode, error]
+     */
+    protected function executeRequest(string $url, array $headers, string $body): array
+    {
+        $curlHandle = curl_init($url);
+        curl_setopt_array($curlHandle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_POSTFIELDS => $body,
+        ]);
+
+        $response = curl_exec($curlHandle);
+        $statusCode = curl_getinfo($curlHandle, CURLINFO_HTTP_CODE);
+        $error = curl_error($curlHandle);
+        curl_close($curlHandle);
+
+        return [$response, $statusCode, $error];
     }
 }
