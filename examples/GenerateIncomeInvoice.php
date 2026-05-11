@@ -3,6 +3,7 @@
 require_once __DIR__.'/../vendor/autoload.php';
 
 use JBadarneh\JoFotara\JoFotaraService;
+use JBadarneh\JoFotara\Response\JoFotaraResponse;
 
 $configs = [
     'client_id' => 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
@@ -99,7 +100,7 @@ $mockSuccessResponse = [
 ];
 
 // // Create a response object from the mock data
-$response = new \JBadarneh\JoFotara\Response\JoFotaraResponse($mockSuccessResponse);
+$response = new JoFotaraResponse($mockSuccessResponse);
 
 // Demonstrate how to use the response object
 echo "\nResponse Handling Example:\n";
