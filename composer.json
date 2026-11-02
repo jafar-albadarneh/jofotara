@@ -19,7 +19,7 @@
         "ext-curl": "*"
     },
     "require-dev": {
-        "pestphp/pest": "^4.0",
+        "pestphp/pest": "^5.3",
         "laravel/pint": "^1.0",
         "ext-dom": "*",
         "ext-libxml": "*"
